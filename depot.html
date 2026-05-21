@@ -362,7 +362,7 @@ function renderDepotList() {
       </div>
       <div class="depot-actions">
         <button class="btn-sm btn-edit" onclick="editDepot(${depot.id})">✏️ 編集</button>
-        ${depot.type !== 'main' ? `<button class="btn-sm btn-delete" onclick="deleteDepot(${depot.id})">削除</button>` : ''}
+        <button class="btn-sm btn-delete" onclick="deleteDepot(${depot.id})">削除</button>
       </div>
     `;
     list.appendChild(div);
