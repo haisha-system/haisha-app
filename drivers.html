@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ドライバー管理 | 配車管理システム</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background: #0f1923; color: white; min-height: 100vh;
+    }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px; pointer-events: none;
+    }
+    header {
+      padding: 24px 40px; border-bottom: 1px solid rgba(255,255,255,0.08);
+      display: flex; align-items: center; gap: 16px;
+    }
+    .back-btn {
+      background: rgba(255,255,255,0.08); border: none; color: white;
+      padding: 7px 14px; border-radius: 6px; cursor: pointer;
+      font-size: 13px; font-family: inherit;
+    }
+    .back-btn:hover { background: rgba(255,255,255,0.15); }
+    header h1 { font-size: 18px; font-weight: 700; }
+    header p  { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+
+    main { max-width: 900px; margin: 0 auto; padding: 32px 40px 100px; }
+
+    .section { margin-bottom: 36px; }
+    .section-title {
+      font-size: 11px; letter-spacing: 0.15em; color: #10b981;
+      font-weight: 500; margin-bottom: 16px; text-transform: uppercase;
+    }
+
+    /* 統計バー */
+    .stats-row {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+      margin-bottom: 28px;
+    }
+    .stat-card {
+      background: #161f2c; border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 10px; padding: 16px 20px;
+    }
+    .stat-label { font-size: 11px; color: rgba(255,255,255,0.4); margin-bottom: 6px; }
+    .stat-value { font-size: 26px; font-weight: 700; }
+    .stat-value span { font-size: 13px; font-weight: 400; color: rgba(255,255,255,0.4); margin-left: 4px; }
+
+    /* 追加フォーム */
+    .add-form {
+      background: #161f2c; border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px; padding: 24px; margin-bottom: 24px;
+    }
+    .add-form h3 { font-size: 14px; font-weight: 700; margin-bottom: 16px; color: rgba(255,255,255,0.8); }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group label { font-size: 11px; color: rgba(255,255,255,0.4); letter-spacing: 0.05em; }
+    .form-group input {
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+      color: white; border-radius: 6px; padding: 8px 12px;
+      font-size: 13px; font-family: inherit;
+    }
+    .form-group input:focus { outline: none; border-color: #10b981; }
+    .form-group input::placeholder { color: rgba(255,255,255,0.25); }
+    .form-group.full { grid-column: 1 / -1; }
+    .form-actions { display: flex; gap: 10px; }
+    .btn-primary {
+      padding: 9px 20px; background: #10b981; color: white;
+      border: none; border-radius: 6px; cursor: pointer;
+      font-size: 13px; font-family: inherit; font-weight: 500;
+    }
+    .btn-primary:hover { background: #059669; }
+    .btn-secondary {
+      padding: 9px 16px; background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.6); border: none; border-radius: 6px;
+      cursor: pointer; font-size: 13px; font-family: inherit;
+    }
+
+    /* ドライバーリスト */
+    .driver-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+    }
+    .driver-card {
+      background: #161f2c; border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px; padding: 18px 20px;
+      transition: border-color 0.2s;
+    }
+    .driver-card:hover { border-color: rgba(255,255,255,0.2); }
+    .driver-card-header {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+    }
+    .driver-avatar {
+      width: 40px; height: 40px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; font-weight: 700; color: white; flex-shrink: 0;
+    }
+    .driver-name { font-size: 15px; font-weight: 700; }
+    .driver-code { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 2px; font-family: monospace; }
+    .driver-info {
+      font-size: 12px; color: rgba(255,255,255,0.4);
+      line-height: 1.8; margin-bottom: 12px;
+    }
+    .driver-info span { color: rgba(255,255,255,0.7); }
+    .driver-actions { display: flex; gap: 8px; }
+    .btn-sm {
+      padding: 5px 12px; border-radius: 5px; border: none;
+      font-size: 12px; cursor: pointer; font-family: inherit;
+    }
+    .btn-edit   { background: rgba(255,255,255,0.1); color: white; }
+    .btn-edit:hover { background: rgba(255,255,255,0.18); }
+    .btn-delete { background: rgba(239,68,68,0.15); color: #f87171; }
+    .btn-delete:hover { background: rgba(239,68,68,0.25); }
+
+    /* 検索 */
+    .search-bar {
+      display: flex; gap: 10px; margin-bottom: 16px;
+    }
+    .search-bar input {
+      flex: 1; background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12); color: white;
+      border-radius: 6px; padding: 8px 14px; font-size: 13px; font-family: inherit;
+    }
+    .search-bar input:focus { outline: none; border-color: #10b981; }
+    .search-bar input::placeholder { color: rgba(255,255,255,0.25); }
+
+    /* 保存バー */
+    .save-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: #0f1923; border-top: 1px solid rgba(255,255,255,0.08);
+      padding: 16px 40px; display: flex; align-items: center; justify-content: space-between;
+    }
+    .save-bar span { font-size: 12px; color: rgba(255,255,255,0.4); }
+    .btn-save {
+      padding: 10px 28px; background: #10b981; color: white;
+      border: none; border-radius: 7px; cursor: pointer;
+      font-size: 14px; font-family: inherit; font-weight: 700;
+    }
+    .btn-save:hover { background: #059669; }
+
+    .toast {
+      display: none; position: fixed; top: 20px; left: 50%;
+      transform: translateX(-50%); background: #10b981; color: white;
+      padding: 10px 24px; border-radius: 20px; font-size: 13px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.3); z-index: 999;
+    }
+    .empty-msg { font-size: 13px; color: rgba(255,255,255,0.3); padding: 20px 0; }
+
+    @media (max-width: 640px) {
+      header { padding: 16px 20px; }
+      main { padding: 20px 20px 100px; }
+      .form-grid { grid-template-columns: 1fr; }
+      .stats-row { grid-template-columns: repeat(3,1fr); }
+      .save-bar { padding: 12px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <button class="back-btn" onclick="location.href='menu.html'">← メニュー</button>
+  <div>
+    <h1>👤 ドライバー管理</h1>
+    <p>ドライバーの登録・社員コード・車両情報の管理（部署1）</p>
+  </div>
+</header>
+
+<main>
+
+  <!-- 統計 -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">登録ドライバー数</div>
+      <div class="stat-value" id="stat-total">0<span>名</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">車両登録済み</div>
+      <div class="stat-value" id="stat-vehicle">0<span>台</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">社員コード登録済み</div>
+      <div class="stat-value" id="stat-code">0<span>名</span></div>
+    </div>
+  </div>
+
+  <!-- 追加フォーム -->
+  <div class="section">
+    <div class="section-title">ドライバーを追加</div>
+    <div class="add-form">
+      <h3>新しいドライバーを登録</h3>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>氏名 *</label>
+          <input type="text" id="new-name" placeholder="例：田中 太郎">
+        </div>
+        <div class="form-group">
+          <label>社員コード *</label>
+          <input type="text" id="new-code" placeholder="例：D001">
+        </div>
+        <div class="form-group">
+          <label>電話番号</label>
+          <input type="tel" id="new-phone" placeholder="例：090-1234-5678">
+        </div>
+        <div class="form-group">
+          <label>担当車両</label>
+          <input type="text" id="new-vehicle" placeholder="例：2t車・4t車">
+        </div>
+        <div class="form-group">
+          <label>担当エリア</label>
+          <input type="text" id="new-area" placeholder="例：姫路市内">
+        </div>
+        <div class="form-group">
+          <label>備考</label>
+          <input type="text" id="new-note" placeholder="例：午前のみ">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-primary" onclick="addDriver()">＋ 追加</button>
+        <button class="btn-secondary" onclick="clearForm()">クリア</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ドライバーリスト -->
+  <div class="section">
+    <div class="section-title">登録済みドライバー</div>
+    <div class="search-bar">
+      <input type="text" id="search-input" placeholder="名前・社員コード・エリアで検索..." oninput="renderDrivers()">
+    </div>
+    <div class="driver-grid" id="driver-grid"></div>
+  </div>
+
+</main>
+
+<div class="save-bar">
+  <span id="save-info">変更は自動保存されます</span>
+  <button class="btn-save" onclick="location.href='menu.html'">← メニューに戻る</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const DRIVER_COLORS = [
+  '#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6',
+  '#1abc9c','#e67e22','#34495e','#e91e63','#00bcd4',
+  '#ff5722','#607d8b','#795548','#4caf50','#2196f3',
+  '#ff9800','#9c27b0','#03a9f4','#8bc34a','#f44336'
+];
+
+let drivers = [];
+
+function loadDrivers() {
+  try {
+    const d = localStorage.getItem('haisha_drivers');
+    if (d) drivers = JSON.parse(d);
+  } catch(e) { drivers = []; }
+}
+
+function saveDrivers() {
+  localStorage.setItem('haisha_drivers', JSON.stringify(drivers));
+}
+
+function updateStats() {
+  document.getElementById('stat-total').innerHTML   = `${drivers.length}<span>名</span>`;
+  document.getElementById('stat-vehicle').innerHTML = `${drivers.filter(d=>d.vehicle).length}<span>台</span>`;
+  document.getElementById('stat-code').innerHTML    = `${drivers.filter(d=>d.code).length}<span>名</span>`;
+}
+
+function renderDrivers() {
+  const grid = document.getElementById('driver-grid');
+  const query = document.getElementById('search-input').value.toLowerCase();
+
+  const filtered = drivers.filter(d =>
+    d.name.toLowerCase().includes(query) ||
+    (d.code||'').toLowerCase().includes(query) ||
+    (d.area||'').toLowerCase().includes(query)
+  );
+
+  grid.innerHTML = '';
+
+  if (filtered.length === 0) {
+    grid.innerHTML = '<p class="empty-msg">登録されているドライバーがありません</p>';
+    return;
+  }
+
+  filtered.forEach((driver, idx) => {
+    const color = DRIVER_COLORS[drivers.indexOf(driver) % DRIVER_COLORS.length];
+    const initials = driver.name.replace(/\s/g,'').slice(-1) || '?';
+
+    const card = document.createElement('div');
+    card.className = 'driver-card';
+    card.style.borderLeft = `3px solid ${color}`;
+    card.innerHTML = `
+      <div class="driver-card-header">
+        <div class="driver-avatar" style="background:${color};">${initials}</div>
+        <div>
+          <div class="driver-name">${driver.name}</div>
+          <div class="driver-code">${driver.code ? '社員コード: '+driver.code : '社員コード未設定'}</div>
+        </div>
+      </div>
+      <div class="driver-info">
+        ${driver.vehicle ? `🚛 車両: <span>${driver.vehicle}</span><br>` : ''}
+        ${driver.area    ? `📍 エリア: <span>${driver.area}</span><br>` : ''}
+        ${driver.phone   ? `📞 <span>${driver.phone}</span><br>` : ''}
+        ${driver.note    ? `📝 <span>${driver.note}</span>` : ''}
+      </div>
+      <div class="driver-actions">
+        <button class="btn-sm btn-edit" onclick="editDriver(${driver.id})">✏️ 編集</button>
+        <button class="btn-sm btn-delete" onclick="deleteDriver(${driver.id})">削除</button>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+
+  updateStats();
+}
+
+function addDriver() {
+  const name    = document.getElementById('new-name').value.trim();
+  const code    = document.getElementById('new-code').value.trim();
+  const phone   = document.getElementById('new-phone').value.trim();
+  const vehicle = document.getElementById('new-vehicle').value.trim();
+  const area    = document.getElementById('new-area').value.trim();
+  const note    = document.getElementById('new-note').value.trim();
+
+  if (!name) { alert('氏名は必須です'); return; }
+  if (!code) { alert('社員コードは必須です'); return; }
+  if (drivers.find(d => d.code === code)) { alert('この社員コードは既に使用されています'); return; }
+
+  const id = Date.now();
+  drivers.push({ id, name, code, phone, vehicle, area, note });
+  saveDrivers();
+  renderDrivers();
+  clearForm();
+  showToast(`${name} を追加しました`);
+}
+
+function editDriver(id) {
+  const d = drivers.find(x => x.id === id);
+  if (!d) return;
+  document.getElementById('new-name').value    = d.name;
+  document.getElementById('new-code').value    = d.code || '';
+  document.getElementById('new-phone').value   = d.phone || '';
+  document.getElementById('new-vehicle').value = d.vehicle || '';
+  document.getElementById('new-area').value    = d.area || '';
+  document.getElementById('new-note').value    = d.note || '';
+  drivers = drivers.filter(x => x.id !== id);
+  saveDrivers();
+  renderDrivers();
+  showToast('編集内容を入力して「追加」を押してください');
+  window.scrollTo(0, 0);
+}
+
+function deleteDriver(id) {
+  const d = drivers.find(x => x.id === id);
+  if (!d) return;
+  if (!confirm(`「${d.name}」を削除しますか？`)) return;
+  drivers = drivers.filter(x => x.id !== id);
+  saveDrivers();
+  renderDrivers();
+  showToast('削除しました');
+}
+
+function clearForm() {
+  ['new-name','new-code','new-phone','new-vehicle','new-area','new-note']
+    .forEach(id => document.getElementById(id).value = '');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 2500);
+}
+
+loadDrivers();
+renderDrivers();
+</script>
+</body>
+</html>

@@ -296,13 +296,24 @@
   <!-- メイン機能 -->
   <div class="section-label">メイン機能</div>
 
-  <a href="index.html" class="main-card">
-    <div class="main-card-icon">🗺</div>
+  <!-- データ読み込みカード -->
+  <div class="main-card" onclick="document.getElementById('file-input-menu').click()" style="cursor:pointer;">
+    <div class="main-card-icon">📂</div>
     <div class="main-card-body">
-      <h2>配車管理</h2>
-      <p>CSVまたはExcelを読み込み、地図上で配送先を確認。<br>最適ルート計算・ドライバーへの割り当て・共有ができます。</p>
+      <h2>データ読み込み</h2>
+      <p>CSVまたはExcelファイルを選択して配車画面を開きます。<br>LYNAのCSV・Excelどちらも対応しています。</p>
     </div>
-    <span class="main-card-badge">利用可能</span>
+    <span class="main-card-badge">今日の配車はここから</span>
+    <div class="main-card-arrow">›</div>
+  </div>
+  <input type="file" id="file-input-menu" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handleFileSelect(event)">
+
+  <a href="index.html" class="main-card" style="background:linear-gradient(135deg,#1a3a2e,#161f2c);border-color:rgba(16,185,129,0.3);">
+    <div class="main-card-icon" style="background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.3);">🗺</div>
+    <div class="main-card-body">
+      <h2>配車管理画面を開く</h2>
+      <p>地図・ルート表示・配車割り当て画面を開きます。<br>（データ読み込み済みの場合）</p>
+    </div>
     <div class="main-card-arrow">›</div>
   </a>
 
@@ -310,19 +321,33 @@
   <div class="section-label">管理機能</div>
   <div class="sub-grid">
 
-    <a href="index.html#drivers" class="sub-card" onclick="sessionStorage.setItem('openPanel','driver');return true;">
+    <a href="drivers.html" class="sub-card">
       <span class="sub-card-icon">👤</span>
       <h3>ドライバー管理</h3>
       <p>ドライバーの登録・社員コード設定・担当エリアの管理</p>
       <div class="accent-line" style="background:#10b981;"></div>
     </a>
 
+    <a href="depot.html" class="sub-card">
+      <span class="sub-card-icon">🏭</span>
+      <h3>拠点管理</h3>
+      <p>デポ・協力会社の住所登録。CSVの拠点コードと紐付け設定</p>
+      <div class="accent-line" style="background:#f59e0b;"></div>
+    </a>
+
+    <div class="sub-card" onclick="exportExcelFromMenu()" style="cursor:pointer;">
+      <span class="sub-card-icon">📥</span>
+      <h3>Excel出力</h3>
+      <p>最後に読み込んだ配車データをExcelファイルで出力します</p>
+      <div class="accent-line" style="background:#e67e22;"></div>
+    </div>
+
     <div class="sub-card disabled">
       <span class="coming-soon">近日公開</span>
       <span class="sub-card-icon">🚗</span>
       <h3>車両管理</h3>
       <p>車両ごとの積載量・最大才数・稼働状況の管理</p>
-      <div class="accent-line" style="background:#f59e0b;"></div>
+      <div class="accent-line" style="background:#ef4444;"></div>
     </div>
 
     <div class="sub-card disabled">
@@ -365,7 +390,44 @@
   <span>Maple Tree Logistics Center, Kobe</span>
 </footer>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
+function handleFileSelect(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  // ファイルをsessionStorageに一時保存してindex.htmlに渡す
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      sessionStorage.setItem('pendingFileName', file.name);
+      sessionStorage.setItem('pendingFileData', JSON.stringify(Array.from(new Uint8Array(e.target.result))));
+      location.href = 'index.html';
+    } catch(err) {
+      alert('ファイルが大きすぎます。配車画面から直接読み込んでください。');
+      location.href = 'index.html';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function exportExcelFromMenu() {
+  const data = sessionStorage.getItem('lastExcelData');
+  if (!data) {
+    alert('配車データがありません。先にデータを読み込んでください。');
+    return;
+  }
+  try {
+    const obj = JSON.parse(data);
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(obj.wsData);
+    ws['!cols'] = [{wch:6},{wch:35},{wch:45},{wch:8},{wch:8},{wch:14},{wch:6}];
+    XLSX.utils.book_append_sheet(wb, ws, '配送ルート');
+    XLSX.writeFile(wb, obj.fileName);
+  } catch(e) {
+    alert('出力エラー: ' + e.message);
+  }
+}
+
 function updateClock() {
   const now = new Date();
   const youbi = '日月火水木金土'[now.getDay()];

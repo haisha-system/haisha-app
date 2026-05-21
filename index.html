@@ -180,22 +180,13 @@
 <body>
 
 <div id="header">
-  <h1>🚚 配車管理システム <span class="supabase-status connecting" id="sb-status">接続中...</span></h1>
-  <div style="display:flex; gap:4px; align-items:center;">
-    <span style="font-size:12px; color:#aaa;">部署:</span>
-    <button class="busho-btn active" id="busho1-btn" onclick="setBusho(1)">部署1（日曜休み）</button>
-    <button class="busho-btn"        id="busho2-btn" onclick="setBusho(2)">部署2（土日休み）</button>
-  </div>
+  <h1>🚚 配車管理 <span style="font-size:11px;font-weight:normal;color:#aee;" id="sb-status"></span></h1>
   <button class="hbtn" style="background:#34495e;" onclick="location.href='menu.html'">☰ メニュー</button>
-  <button class="hbtn" id="upload-btn" onclick="document.getElementById('file-input').click()">📂 CSV/Excel読み込む</button>
-  <input type="file" id="file-input" accept=".xlsx,.xls,.csv" onchange="loadFile(event)">
   <button class="hbtn" id="route-btn"  onclick="drawRoute()">🗺 最適ルート表示</button>
   <button class="hbtn" id="clear-btn"  onclick="clearRoute()">✕ ルート消去</button>
-  <button class="hbtn" id="driver-btn" onclick="openDriverPanel()">👤 ドライバー管理</button>
   <button class="hbtn" id="assign-btn" onclick="openAssignPanel()">🚛 配車割り当て</button>
-  <button class="hbtn" id="share-btn"  onclick="openSharePanel()">📡 共有・送信</button>
-  <button class="hbtn" id="excel-btn"  onclick="exportExcel()">📥 Excel出力</button>
-  <span id="status">部署を選んでExcelを読み込んでください</span>
+  <input type="file" id="file-input" accept=".xlsx,.xls,.csv" onchange="loadFile(event)" style="display:none;">
+  <span id="status">メニューからデータを読み込んでください</span>
 </div>
 
 <div id="main">
@@ -223,16 +214,7 @@
 
 <div id="overlay" onclick="closeAllPanels()"></div>
 
-<!-- ドライバー管理パネル -->
-<div id="driver-panel" class="panel">
-  <h2>👤 ドライバー管理</h2>
-  <div class="driver-input-row">
-    <input type="text" id="driver-name-input" placeholder="ドライバー名を入力" onkeydown="if(event.key==='Enter')addDriver()">
-    <button onclick="addDriver()">追加</button>
-  </div>
-  <div id="driver-list-container"></div>
-  <button class="panel-close" onclick="closeAllPanels()">閉じる</button>
-</div>
+
 
 <!-- 配車割り当てパネル -->
 <div id="assign-panel" class="panel">
@@ -247,16 +229,7 @@
   </div>
 </div>
 
-<!-- 共有パネル -->
-<div id="share-panel" class="panel">
-  <h2>📡 ドライバーへ共有</h2>
-  <div class="share-info">
-    配車データをSupabaseに保存し、ドライバーのスマホに共有します。<br>
-    ドライバーはURLを開くだけで自分の配送先を確認できます。
-  </div>
-  <div id="share-content"></div>
-  <button class="panel-close" onclick="closeAllPanels()">閉じる</button>
-</div>
+
 
 <script>
 // ===== Supabase設定 =====
@@ -269,20 +242,63 @@ async function checkSupabase() {
   try {
     const { error } = await sbClient.from('deliveries').select('id').limit(1);
     const el = document.getElementById('sb-status');
-    if (error) { el.textContent = '未接続'; el.className = 'supabase-status err'; }
-    else        { el.textContent = '接続済み'; el.className = 'supabase-status ok'; }
-  } catch(e) {
-    const el = document.getElementById('sb-status');
-    el.textContent = '未接続'; el.className = 'supabase-status err';
-  }
+    if (el) el.textContent = error ? '' : '● DB接続済み';
+  } catch(e) {}
 }
 
 // ===== 定数・状態 =====
-const DEPOT = {
+// ===== 拠点設定（depot.htmlで管理） =====
+let DEPOT = {
   lat: 34.6664, lng: 135.0059,
   name: 'メープルツリー神戸ロジスティクスセンター',
   addr: '兵庫県神戸市西区見津が丘7丁目1-3'
 };
+
+function loadDepotsFromStorage() {
+  try {
+    const d = localStorage.getItem('haisha_depots');
+    const m = localStorage.getItem('haisha_mappings');
+    if (d) window._depots   = JSON.parse(d);
+    if (m) window._mappings = JSON.parse(m);
+  } catch(e) {}
+  if (!window._depots) {
+    window._depots = [
+      { id:1, name:'神戸デポ', loadAddr:'兵庫県神戸市西区見津が丘7丁目1-3', departAddr:'', csvCode:'2806', lat:34.6664, lng:135.0059 },
+      { id:2, name:'丹波デポ', loadAddr:'兵庫県丹波市氷上町氷上10', departAddr:'', csvCode:'2805', lat:35.1167, lng:135.0167 }
+    ];
+    window._mappings = { '2806':1, '2805':2 };
+  }
+}
+
+function setDepotByCode(csvCode) {
+  if (!csvCode || !window._mappings) return;
+  const depotId = window._mappings[csvCode];
+  if (!depotId) return;
+  const depot = (window._depots||[]).find(d => d.id == depotId);
+  if (!depot) return;
+
+  const useAddr = depot.departAddr || depot.loadAddr;
+  DEPOT = {
+    lat:  depot.lat  || 34.6664,
+    lng:  depot.lng  || 135.0059,
+    name: depot.name,
+    addr: useAddr
+  };
+
+  // デポ情報をサイドバーに反映
+  const nameEl = document.querySelector('.depot-name');
+  const addrEl = document.querySelector('.depot-addr');
+  if (nameEl) nameEl.textContent = depot.name;
+  if (addrEl) addrEl.textContent = useAddr;
+
+  // デポマーカーを更新
+  if (depotMarker) {
+    depotMarker.setPosition({ lat: DEPOT.lat, lng: DEPOT.lng });
+    depotMarker.setTitle(DEPOT.name);
+  }
+
+  document.getElementById('status').textContent += ` ／ 拠点: ${depot.name}`;
+}
 const DRIVER_COLORS = [
   '#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6',
   '#1abc9c','#e67e22','#34495e','#e91e63','#00bcd4',
@@ -303,10 +319,7 @@ function loadDrivers() {
 
 // ===== 部署・日付 =====
 function setBusho(n) {
-  currentBusho = n;
-  document.getElementById('busho1-btn').classList.toggle('active', n === 1);
-  document.getElementById('busho2-btn').classList.toggle('active', n === 2);
-  document.getElementById('status').textContent = n === 1 ? '部署1（日曜休み）を選択しました' : '部署2（土日休み）を選択しました';
+  currentBusho = 1; // 部署1固定
 }
 
 function parseExcelDate(val) {
@@ -343,6 +356,7 @@ function initMap() {
     label: { text: '出', color: 'white', fontSize: '10px', fontWeight: 'bold' }
   });
   depotMarker.addListener('click', () => new google.maps.InfoWindow({ content: `<b>🏭 出発地</b><br>${DEPOT.name}<br><small>${DEPOT.addr}</small>` }).open(map, depotMarker));
+  setTimeout(loadPendingFile, 500);
 }
 
 // ===== CSV/Excel振り分け =====
@@ -442,6 +456,15 @@ function loadCSV(file) {
       } else {
         currentDate = todayStr();
       }
+
+      // 拠点コードでデポを自動切り替え
+      const csvCodes = [...new Set(rows.map(line => {
+        if (!line.trim()) return null;
+        const cols = parseCSVLine(line);
+        const codeIdx2 = headers.findIndex(h => h.includes('配送拠点コード'));
+        return codeIdx2 >= 0 ? cols[codeIdx2] : null;
+      }).filter(Boolean))];
+      if (csvCodes.length > 0) setDepotByCode(csvCodes[0]);
 
       // 地図にプロット
       markers.forEach(m => m.setMap(null)); markers = [];
@@ -875,8 +898,8 @@ function exportAllDrivers() {
 
 function exportExcel() {
   const locs=orderedLocations.length>0?orderedLocations:locations;
-  if (locs.length===0) { alert('先にExcelを読み込んでください'); return; }
-  const deliveryDate=getDeliveryDate(currentDate,currentBusho); const bushoName=currentBusho===1?'部署1':'部署2';
+  if (locs.length===0) { alert('先にデータを読み込んでください'); return; }
+  const deliveryDate=getDeliveryDate(currentDate,currentBusho); const bushoName='部署1';
   const wsData=[['配送ルート表'],[`配送日: ${deliveryDate}　【${bushoName}】`],[],['順番','店舗名','住所','個数','才数','担当ドライバー','便']];
   wsData.push(['',DEPOT.name,DEPOT.addr,'','','','出発']);
   locs.forEach((loc,i)=>{
@@ -886,14 +909,17 @@ function exportExcel() {
   });
   wsData.push(['',DEPOT.name,DEPOT.addr,'','','','帰着']);
   wsData.push([],['合計','','',locs.reduce((s,l)=>s+(Number(l.items)||0),0),locs.reduce((s,l)=>s+(Number(l.vol)||0),0).toFixed(1),'','']);
+  const fileName=`配送ルート_${bushoName}_${currentDate}.xlsx`;
+  // メニューからの出力用にsessionStorageに保存
+  try { sessionStorage.setItem('lastExcelData', JSON.stringify({wsData, fileName})); } catch(e){}
   const ws=XLSX.utils.aoa_to_sheet(wsData); ws['!cols']=[{wch:6},{wch:35},{wch:45},{wch:8},{wch:8},{wch:14},{wch:6}];
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'配送ルート');
-  XLSX.writeFile(wb,`配送ルート_${bushoName}_${currentDate}.xlsx`);
+  XLSX.writeFile(wb,fileName);
 }
 
 // ===== ユーティリティ =====
 function closeAllPanels() {
-  ['driver-panel','assign-panel','share-panel'].forEach(id=>document.getElementById(id).style.display='none');
+  ['driver-panel','assign-panel'].forEach(id=>document.getElementById(id).style.display='none');
   document.getElementById('overlay').style.display='none';
 }
 function dist(a,b) { const R=111,dlat=(b.lat-a.lat)*R,dlng=(b.lng-a.lng)*R*Math.cos((a.lat+b.lat)/2*Math.PI/180); return Math.sqrt(dlat*dlat+dlng*dlng); }
@@ -905,7 +931,76 @@ function nearestNeighbor(locs,start) {
 }
 
 loadDrivers();
+loadDepotsFromStorage();
 checkSupabase();
+
+// メニューから渡されたファイルを自動読み込み
+function loadPendingFile() {
+  const fileName = sessionStorage.getItem('pendingFileName');
+  const fileDataStr = sessionStorage.getItem('pendingFileData');
+  if (!fileName || !fileDataStr) return;
+  sessionStorage.removeItem('pendingFileName');
+  sessionStorage.removeItem('pendingFileData');
+  try {
+    const arr = JSON.parse(fileDataStr);
+    const uint8 = new Uint8Array(arr);
+    const ext = fileName.split('.').pop().toLowerCase();
+    document.getElementById('status').textContent = `${fileName} を読み込み中...`;
+    if (ext === 'csv') {
+      const blob = new Blob([uint8]);
+      const file = new File([blob], fileName);
+      loadCSV(file);
+    } else {
+      const workbook = XLSX.read(uint8, { type: 'array', cellDates: true });
+      const fakeEvent = {
+        target: { files: [new File([new Blob([uint8])], fileName)] }
+      };
+      // XLSXデータを直接処理
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { raw: false });
+      const rowsRaw = XLSX.utils.sheet_to_json(sheet, { raw: true });
+      processExcelData(rows, rowsRaw);
+    }
+  } catch(e) {
+    document.getElementById('status').textContent = 'ファイル読み込みエラー: ' + e.message;
+  }
+}
+
+// Excel処理を関数に分離
+function processExcelData(rows, rowsRaw) {
+  if (rows.length === 0) { document.getElementById('status').textContent = 'データが見つかりません'; return; }
+  const keys = Object.keys(rows[0]);
+  const addrKey = keys.find(k => k.includes('顧客住所1') || k.includes('住所'));
+  const nameKey = keys.find(k => k.includes('顧客名称') || k.includes('名称'));
+  const itemKey = keys.find(k => k === '個数' || k.includes('数量'));
+  const volKey  = keys.find(k => k === '才数' || k.includes('才'));
+  const dateKey = keys.find(k => k.includes('日付'));
+  if (!addrKey) { document.getElementById('status').textContent = '住所列が見つかりません'; return; }
+  currentDate = (dateKey && rowsRaw[0][dateKey]) ? (parseExcelDate(rowsRaw[0][dateKey]) || todayStr()) : todayStr();
+  markers.forEach(m=>m.setMap(null)); markers=[];
+  if (routeLine) { routeLine.setMap(null); routeLine=null; }
+  locations=[]; orderedLocations=[]; assignments={}; currentDeliveryId=null;
+  document.getElementById('status').textContent = `${rows.length}件を地図に配置中...`;
+  const geocoder = new google.maps.Geocoder();
+  let processed = 0;
+  rows.forEach((row,i)=>{
+    const addr=row[addrKey]; const name=nameKey?row[nameKey]:`配送先${i+1}`;
+    const items=itemKey?rowsRaw[i][itemKey]:null; const vol=volKey?rowsRaw[i][volKey]:null;
+    if (!addr){processed++;checkDone(processed,rows.length);return;}
+    geocoder.geocode({address:String(addr)},(results,status)=>{
+      processed++;
+      if (status==='OK'){
+        const lat=results[0].geometry.location.lat(); const lng=results[0].geometry.location.lng();
+        const idx=locations.length;
+        locations.push({name:String(name),addr:String(addr),lat,lng,items,vol});
+        const marker=new google.maps.Marker({position:{lat,lng},map,title:String(name),label:{text:String(idx+1),color:'white',fontSize:'11px',fontWeight:'bold'}});
+        marker.addListener('click',()=>new google.maps.InfoWindow({content:`<div style="font-size:13px;"><b>${name}</b><br><span style="color:#666;font-size:12px;">${addr}</span>${items?`<br><span style="font-size:12px;">個数: ${items}個</span>`:''}${vol?`<span style="font-size:12px;"> / ${vol}才</span>`:''}</div>`}).open(map,marker));
+        markers.push(marker);
+      }
+      checkDone(processed,rows.length);
+    });
+  });
+}
 </script>
 
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBP4DqTiYGVyDZv4mwguXoHYfcpHt4kO8E&callback=initMap" async defer></script>
