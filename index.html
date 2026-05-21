@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>配車管理システム</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
+    #header {
+      background: #2c3e50; color: white;
+      padding: 10px 20px; display: flex; align-items: center; gap: 12px;
+      flex-shrink: 0; flex-wrap: wrap;
+    }
+    #header h1 { font-size: 16px; }
+    .hbtn {
+      color: white; border: none;
+      padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px;
+    }
+    #upload-btn  { background: #27ae60; }
+    #route-btn   { background: #2980b9; }
+    #clear-btn   { background: #7f8c8d; }
+    #excel-btn   { background: #e67e22; }
+    #assign-btn  { background: #8e44ad; }
+    #driver-btn  { background: #16a085; }
+    #share-btn   { background: #c0392b; }
+    .busho-btn {
+      background: transparent; border: 1px solid #aaa;
+      color: #ccc; padding: 4px 12px; border-radius: 4px;
+      cursor: pointer; font-size: 12px;
+    }
+    .busho-btn.active {
+      background: #f39c12; border-color: #f39c12; color: white; font-weight: bold;
+    }
+    #status { font-size: 13px; color: #aee; }
+    #file-input { display: none; }
+    #main { display: flex; flex: 1; overflow: hidden; }
+    #map { flex: 1; }
+    #sidebar {
+      width: 300px; background: #f8f8f8;
+      border-left: 1px solid #ddd; overflow-y: auto; padding: 10px;
+      flex-shrink: 0;
+    }
+    .tab-bar { display: flex; gap: 4px; margin-bottom: 10px; }
+    .tab-btn {
+      flex: 1; padding: 5px 4px; font-size: 11px; border: 1px solid #ddd;
+      background: white; border-radius: 4px; cursor: pointer; color: #555;
+    }
+    .tab-btn.active { background: #2c3e50; color: white; border-color: #2c3e50; font-weight: bold; }
+    #sidebar-title { font-size: 13px; color: #555; margin-bottom: 8px; font-weight: bold; }
+    .stop-item {
+      background: white; border: 1px solid #ddd; border-radius: 6px;
+      padding: 8px 10px; margin-bottom: 6px; font-size: 12px; cursor: pointer;
+    }
+    .stop-item:hover { background: #e8f4fd; }
+    .stop-num {
+      display: inline-flex; align-items: center; justify-content: center;
+      background: #e74c3c; color: white; border-radius: 50%;
+      width: 22px; height: 22px; font-size: 11px; font-weight: bold;
+      margin-right: 6px; flex-shrink: 0;
+    }
+    .stop-num.optimal { background: #1D9E75; }
+    .stop-name  { font-weight: 500; color: #222; }
+    .stop-addr  { color: #888; margin-top: 3px; font-size: 11px; padding-left: 28px; }
+    .stop-meta  { color: #aaa; margin-top: 2px; font-size: 11px; padding-left: 28px; }
+    .stop-header { display: flex; align-items: center; }
+    .depot-card {
+      background: #f3eaff; border: 1px solid #c39bd3; border-radius: 6px;
+      padding: 8px 10px; margin-bottom: 10px; font-size: 12px;
+    }
+    .depot-label { font-size: 11px; color: #8e44ad; font-weight: bold; margin-bottom: 2px; }
+    .depot-name  { font-weight: 500; color: #222; font-size: 13px; }
+    .depot-addr  { color: #888; font-size: 11px; margin-top: 2px; }
+
+    /* パネル共通 */
+    .panel {
+      display: none; position: fixed; top: 50%; left: 50%; z-index: 1000;
+      transform: translate(-50%, -50%);
+      background: white; border-radius: 10px; box-shadow: 0 4px 30px rgba(0,0,0,0.3);
+      max-height: 85vh; overflow-y: auto; padding: 20px;
+    }
+    #driver-panel { width: 420px; }
+    #assign-panel { width: 560px; }
+    #share-panel  { width: 440px; }
+
+    #overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 999;
+    }
+    .panel h2 { font-size: 15px; margin-bottom: 12px; color: #2c3e50; }
+    .panel-close {
+      display: block; width: 100%; margin-top: 14px;
+      padding: 8px; background: #95a5a6; color: white; border: none;
+      border-radius: 5px; cursor: pointer; font-size: 13px;
+    }
+
+    /* ドライバー管理 */
+    .driver-input-row { display: flex; gap: 8px; margin-bottom: 10px; }
+    .driver-input-row input {
+      flex: 1; padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;
+    }
+    .driver-input-row button {
+      padding: 6px 14px; background: #16a085; color: white; border: none;
+      border-radius: 4px; cursor: pointer; font-size: 13px;
+    }
+    .driver-list-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 7px 10px; border: 1px solid #eee; border-radius: 5px;
+      margin-bottom: 5px; font-size: 13px; background: #fafafa;
+    }
+    .driver-list-item .ddel {
+      background: #e74c3c; color: white; border: none; border-radius: 3px;
+      padding: 2px 8px; cursor: pointer; font-size: 11px;
+    }
+
+    /* 配車割り当て */
+    #assign-summary { font-size: 12px; color: #888; margin-bottom: 12px; }
+    .assign-driver-block {
+      border: 2px solid #ddd; border-radius: 8px; margin-bottom: 12px; overflow: hidden;
+    }
+    .assign-driver-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px; font-size: 13px; font-weight: bold;
+    }
+    .assign-driver-meta { font-size: 11px; color: #666; font-weight: normal; }
+    .assign-driver-body { padding: 8px 10px; }
+    .assign-stop-item {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 8px; border: 1px solid #eee; border-radius: 5px;
+      margin-bottom: 4px; font-size: 12px; background: #fff;
+    }
+    .assign-stop-item .asn { font-weight: 500; flex: 1; }
+    .assign-stop-item .asm { color: #888; font-size: 11px; }
+    .assign-stop-item select {
+      font-size: 11px; border: 1px solid #ccc; border-radius: 3px; padding: 1px 4px;
+    }
+    .assign-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+    .assign-actions button {
+      flex: 1; padding: 8px; border: none; border-radius: 5px;
+      cursor: pointer; font-size: 13px; color: white;
+    }
+    .btn-auto       { background: #8e44ad; }
+    .btn-apply      { background: #27ae60; }
+    .btn-cancel     { background: #95a5a6; }
+    .btn-export-all { background: #e67e22; }
+
+    /* ドライバータブ */
+    .driver-tab-bar { display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 8px; }
+    .driver-tab {
+      padding: 3px 10px; font-size: 11px; border-radius: 3px;
+      cursor: pointer; border: 1px solid #ddd; background: white; color: #555;
+    }
+    .driver-tab.active { color: white; font-weight: bold; border-color: transparent; }
+
+    /* 共有パネル */
+    .share-url-box {
+      background: #f0f8ff; border: 1px solid #3498db; border-radius: 6px;
+      padding: 10px; margin: 10px 0; word-break: break-all; font-size: 12px; color: #2980b9;
+    }
+    .share-driver-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 10px; border: 1px solid #eee; border-radius: 5px;
+      margin-bottom: 6px; font-size: 13px;
+    }
+    .share-driver-item .copy-btn {
+      background: #3498db; color: white; border: none; border-radius: 3px;
+      padding: 3px 10px; cursor: pointer; font-size: 11px;
+    }
+    .share-info { font-size: 12px; color: #666; margin-bottom: 10px; line-height: 1.6; }
+    .supabase-status {
+      display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px;
+      font-weight: bold; margin-left: 8px;
+    }
+    .supabase-status.ok  { background: #2ecc71; color: white; }
+    .supabase-status.err { background: #e74c3c; color: white; }
+    .supabase-status.connecting { background: #f39c12; color: white; }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <h1>🚚 配車管理システム <span class="supabase-status connecting" id="sb-status">接続中...</span></h1>
+  <div style="display:flex; gap:4px; align-items:center;">
+    <span style="font-size:12px; color:#aaa;">部署:</span>
+    <button class="busho-btn active" id="busho1-btn" onclick="setBusho(1)">部署1（日曜休み）</button>
+    <button class="busho-btn"        id="busho2-btn" onclick="setBusho(2)">部署2（土日休み）</button>
+  </div>
+  <button class="hbtn" id="upload-btn" onclick="document.getElementById('file-input').click()">📂 Excelを読み込む</button>
+  <input type="file" id="file-input" accept=".xlsx,.xls" onchange="loadExcel(event)">
+  <button class="hbtn" id="route-btn"  onclick="drawRoute()">🗺 最適ルート表示</button>
+  <button class="hbtn" id="clear-btn"  onclick="clearRoute()">✕ ルート消去</button>
+  <button class="hbtn" id="driver-btn" onclick="openDriverPanel()">👤 ドライバー管理</button>
+  <button class="hbtn" id="assign-btn" onclick="openAssignPanel()">🚛 配車割り当て</button>
+  <button class="hbtn" id="share-btn"  onclick="openSharePanel()">📡 共有・送信</button>
+  <button class="hbtn" id="excel-btn"  onclick="exportExcel()">📥 Excel出力</button>
+  <span id="status">部署を選んでExcelを読み込んでください</span>
+</div>
+
+<div id="main">
+  <div id="map"></div>
+  <div id="sidebar">
+    <div class="depot-card">
+      <div class="depot-label">🏭 出発地（デポ）</div>
+      <div class="depot-name">メープルツリー神戸ロジスティクスセンター</div>
+      <div class="depot-addr">兵庫県神戸市西区見津が丘7丁目1-3</div>
+    </div>
+    <div class="tab-bar">
+      <button class="tab-btn active" id="tab-all"    onclick="switchTab('all')">全店舗</button>
+      <button class="tab-btn"        id="tab-driver" onclick="switchTab('driver')">ドライバー別</button>
+    </div>
+    <div id="tab-all-content">
+      <div id="sidebar-title">配送先リスト</div>
+      <div id="stop-list"><p style="font-size:12px;color:#aaa;">Excelを読み込むとここに表示されます</p></div>
+    </div>
+    <div id="tab-driver-content" style="display:none;">
+      <div class="driver-tab-bar" id="driver-tab-bar"></div>
+      <div id="driver-stop-list"></div>
+    </div>
+  </div>
+</div>
+
+<div id="overlay" onclick="closeAllPanels()"></div>
+
+<!-- ドライバー管理パネル -->
+<div id="driver-panel" class="panel">
+  <h2>👤 ドライバー管理</h2>
+  <div class="driver-input-row">
+    <input type="text" id="driver-name-input" placeholder="ドライバー名を入力" onkeydown="if(event.key==='Enter')addDriver()">
+    <button onclick="addDriver()">追加</button>
+  </div>
+  <div id="driver-list-container"></div>
+  <button class="panel-close" onclick="closeAllPanels()">閉じる</button>
+</div>
+
+<!-- 配車割り当てパネル -->
+<div id="assign-panel" class="panel">
+  <h2>🚛 配車割り当て</h2>
+  <div id="assign-summary"></div>
+  <div id="assign-content"></div>
+  <div class="assign-actions">
+    <button class="btn-auto"       onclick="autoAssign()">⚡ 個数で自動振り分け</button>
+    <button class="btn-export-all" onclick="exportAllDrivers()">📥 全員分Excel出力</button>
+    <button class="btn-apply"      onclick="applyAssign()">✅ 地図に反映</button>
+    <button class="btn-cancel"     onclick="closeAllPanels()">閉じる</button>
+  </div>
+</div>
+
+<!-- 共有パネル -->
+<div id="share-panel" class="panel">
+  <h2>📡 ドライバーへ共有</h2>
+  <div class="share-info">
+    配車データをSupabaseに保存し、ドライバーのスマホに共有します。<br>
+    ドライバーはURLを開くだけで自分の配送先を確認できます。
+  </div>
+  <div id="share-content"></div>
+  <button class="panel-close" onclick="closeAllPanels()">閉じる</button>
+</div>
+
+<script>
+// ===== Supabase設定 =====
+const SUPABASE_URL = 'https://hpycoozpspcxtesuzdpw.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhweWNvb3pwc3BjeHRlc3V6ZHB3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyOTEwMzgsImV4cCI6MjA5NDg2NzAzOH0._5uJmcBC7_-DwUW6JzXqlIXXn-NLluDO8BML8SGyaRA';
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Supabase接続確認
+async function checkSupabase() {
+  try {
+    const { error } = await sbClient.from('deliveries').select('id').limit(1);
+    const el = document.getElementById('sb-status');
+    if (error) { el.textContent = '未接続'; el.className = 'supabase-status err'; }
+    else        { el.textContent = '接続済み'; el.className = 'supabase-status ok'; }
+  } catch(e) {
+    const el = document.getElementById('sb-status');
+    el.textContent = '未接続'; el.className = 'supabase-status err';
+  }
+}
+
+// ===== 定数・状態 =====
+const DEPOT = {
+  lat: 34.6664, lng: 135.0059,
+  name: 'メープルツリー神戸ロジスティクスセンター',
+  addr: '兵庫県神戸市西区見津が丘7丁目1-3'
+};
+const DRIVER_COLORS = [
+  '#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6',
+  '#1abc9c','#e67e22','#34495e','#e91e63','#00bcd4',
+  '#ff5722','#607d8b','#795548','#4caf50','#2196f3',
+  '#ff9800','#9c27b0','#03a9f4','#8bc34a','#f44336'
+];
+
+let map, markers = [], routeLine = null, depotMarker = null;
+let locations = [], currentDate = '', orderedLocations = [], currentBusho = 1;
+let currentTab = 'all', selectedDriverTab = 0;
+let drivers = [], assignments = {};
+let currentDeliveryId = null;
+
+function saveDrivers() { localStorage.setItem('haisha_drivers', JSON.stringify(drivers)); }
+function loadDrivers() {
+  try { const d = localStorage.getItem('haisha_drivers'); if (d) drivers = JSON.parse(d); } catch(e) { drivers = []; }
+}
+
+// ===== 部署・日付 =====
+function setBusho(n) {
+  currentBusho = n;
+  document.getElementById('busho1-btn').classList.toggle('active', n === 1);
+  document.getElementById('busho2-btn').classList.toggle('active', n === 2);
+  document.getElementById('status').textContent = n === 1 ? '部署1（日曜休み）を選択しました' : '部署2（土日休み）を選択しました';
+}
+
+function parseExcelDate(val) {
+  if (!val) return null;
+  if (val instanceof Date) return fmt(val);
+  if (typeof val === 'number') {
+    const d = new Date(new Date(1899,11,30).getTime() + val * 86400000);
+    return fmt(d);
+  }
+  const str = String(val).replace(/[\/\-年月]/g,'').replace('日','').trim();
+  if (str.length === 8) return str;
+  const d = new Date(val);
+  if (!isNaN(d)) return fmt(d);
+  return null;
+}
+function fmt(d) { return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`; }
+function todayStr() { return fmt(new Date()); }
+
+function getDeliveryDate(dateStr, busho) {
+  if (!dateStr || dateStr.length !== 8) return '不明';
+  let date = new Date(parseInt(dateStr.slice(0,4)), parseInt(dateStr.slice(4,6))-1, parseInt(dateStr.slice(6,8)));
+  date.setDate(date.getDate() + 1);
+  if (busho === 1) { if (date.getDay()===0) date.setDate(date.getDate()+1); }
+  else { if (date.getDay()===6) date.setDate(date.getDate()+2); if (date.getDay()===0) date.setDate(date.getDate()+1); }
+  return `${date.getFullYear()}年${date.getMonth()+1}月${date.getDate()}日（${'日月火水木金土'[date.getDay()]}）`;
+}
+
+// ===== 地図初期化 =====
+function initMap() {
+  map = new google.maps.Map(document.getElementById('map'), { center: { lat: 34.76, lng: 134.85 }, zoom: 11 });
+  depotMarker = new google.maps.Marker({
+    position: { lat: DEPOT.lat, lng: DEPOT.lng }, map, title: DEPOT.name,
+    icon: { path: google.maps.SymbolPath.CIRCLE, scale: 14, fillColor: '#8e44ad', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 },
+    label: { text: '出', color: 'white', fontSize: '10px', fontWeight: 'bold' }
+  });
+  depotMarker.addListener('click', () => new google.maps.InfoWindow({ content: `<b>🏭 出発地</b><br>${DEPOT.name}<br><small>${DEPOT.addr}</small>` }).open(map, depotMarker));
+}
+
+// ===== Excel読み込み =====
+function loadExcel(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  document.getElementById('status').textContent = '読み込み中...';
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { raw: false });
+      const rowsRaw = XLSX.utils.sheet_to_json(sheet, { raw: true });
+      if (rows.length === 0) { document.getElementById('status').textContent = 'データが見つかりません'; return; }
+      const keys = Object.keys(rows[0]);
+      const addrKey = keys.find(k => k.includes('顧客住所1') || k.includes('住所'));
+      const nameKey = keys.find(k => k.includes('顧客名称') || k.includes('名称'));
+      const itemKey = keys.find(k => k === '個数' || k.includes('数量'));
+      const volKey  = keys.find(k => k === '才数' || k.includes('才'));
+      const dateKey = keys.find(k => k.includes('日付'));
+      if (!addrKey) { document.getElementById('status').textContent = '住所列が見つかりません'; return; }
+      currentDate = (dateKey && rowsRaw[0][dateKey]) ? (parseExcelDate(rowsRaw[0][dateKey]) || todayStr()) : todayStr();
+      markers.forEach(m => m.setMap(null)); markers = [];
+      if (routeLine) { routeLine.setMap(null); routeLine = null; }
+      locations = []; orderedLocations = []; assignments = {}; currentDeliveryId = null;
+      document.getElementById('status').textContent = `${rows.length}件を地図に配置中...`;
+      const geocoder = new google.maps.Geocoder();
+      let processed = 0;
+      rows.forEach((row, i) => {
+        const addr  = row[addrKey];
+        const name  = nameKey ? row[nameKey] : `配送先${i+1}`;
+        const items = itemKey ? rowsRaw[i][itemKey] : null;
+        const vol   = volKey  ? rowsRaw[i][volKey]  : null;
+        if (!addr) { processed++; checkDone(processed, rows.length); return; }
+        geocoder.geocode({ address: String(addr) }, (results, status) => {
+          processed++;
+          if (status === 'OK') {
+            const lat = results[0].geometry.location.lat();
+            const lng = results[0].geometry.location.lng();
+            const idx = locations.length;
+            locations.push({ name: String(name), addr: String(addr), lat, lng, items, vol });
+            const marker = new google.maps.Marker({
+              position: { lat, lng }, map, title: String(name),
+              label: { text: String(idx+1), color: 'white', fontSize: '11px', fontWeight: 'bold' }
+            });
+            marker.addListener('click', () => new google.maps.InfoWindow({
+              content: `<div style="font-size:13px;"><b>${name}</b><br><span style="color:#666;font-size:12px;">${addr}</span>${items?`<br><span style="font-size:12px;">個数: ${items}個</span>`:''}${vol?`<span style="font-size:12px;"> / ${vol}才</span>`:''}</div>`
+            }).open(map, marker));
+            markers.push(marker);
+          }
+          checkDone(processed, rows.length);
+        });
+      });
+    } catch(err) { document.getElementById('status').textContent = 'エラー: ' + err.message; }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function checkDone(processed, total) {
+  if (processed === total) {
+    document.getElementById('status').textContent = `${locations.length}件を表示しました`;
+    updateSidebar(locations, false);
+    if (locations.length > 0) {
+      const bounds = new google.maps.LatLngBounds();
+      bounds.extend({ lat: DEPOT.lat, lng: DEPOT.lng });
+      locations.forEach(l => bounds.extend({ lat: l.lat, lng: l.lng }));
+      map.fitBounds(bounds);
+    }
+  }
+}
+
+// ===== タブ =====
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tab-all').classList.toggle('active', tab==='all');
+  document.getElementById('tab-driver').classList.toggle('active', tab==='driver');
+  document.getElementById('tab-all-content').style.display    = tab==='all'    ? '' : 'none';
+  document.getElementById('tab-driver-content').style.display = tab==='driver' ? '' : 'none';
+  if (tab === 'driver') renderDriverTab();
+}
+
+function renderDriverTab() {
+  const bar = document.getElementById('driver-tab-bar');
+  const list = document.getElementById('driver-stop-list');
+  bar.innerHTML = ''; list.innerHTML = '';
+  if (drivers.length === 0) { list.innerHTML = '<p style="font-size:12px;color:#aaa;">ドライバーを登録してください</p>'; return; }
+  const tabs = [{ id: -1, name: '未割当' }, ...drivers];
+  tabs.forEach((d, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'driver-tab' + (idx===selectedDriverTab?' active':'');
+    btn.textContent = d.name;
+    if (idx===selectedDriverTab) {
+      const color = d.id===-1 ? '#95a5a6' : DRIVER_COLORS[drivers.findIndex(x=>x.id===d.id)%DRIVER_COLORS.length];
+      btn.style.background = color; btn.style.borderColor = color; btn.style.color='white';
+    }
+    btn.onclick = () => { selectedDriverTab = idx; renderDriverTab(); };
+    bar.appendChild(btn);
+  });
+  const selTab = tabs[selectedDriverTab];
+  let targetLocs = selTab.id===-1
+    ? locations.map((loc,i)=>({loc,i})).filter(({i})=>!assignments[i])
+    : locations.map((loc,i)=>({loc,i})).filter(({i})=>assignments[i]&&assignments[i].driverId===selTab.id);
+  if (targetLocs.length===0) { list.innerHTML='<p style="font-size:12px;color:#aaa;">店舗なし</p>'; return; }
+  const driverIdx = selTab.id===-1 ? -1 : drivers.findIndex(x=>x.id===selTab.id);
+  const color = driverIdx>=0 ? DRIVER_COLORS[driverIdx%DRIVER_COLORS.length] : '#95a5a6';
+  const totalItems = targetLocs.reduce((s,{loc})=>s+(Number(loc.items)||0),0);
+  const totalVol   = targetLocs.reduce((s,{loc})=>s+(Number(loc.vol)||0),0);
+  const summary = document.createElement('div');
+  summary.style.cssText='font-size:11px;color:#666;margin-bottom:8px;padding:4px 8px;background:#f0f0f0;border-radius:4px;';
+  summary.textContent=`${targetLocs.length}件 / 個数: ${totalItems}個 / 才数: ${totalVol.toFixed(1)}才`;
+  list.appendChild(summary);
+  targetLocs.forEach(({loc,i})=>{
+    const bin = assignments[i]?assignments[i].bin:null;
+    const div = document.createElement('div');
+    div.className='stop-item'; div.style.borderLeft=`4px solid ${color}`;
+    div.innerHTML=`<div class="stop-header"><span class="stop-name">${loc.name}</span>${bin?`<span style="margin-left:auto;font-size:10px;background:${color};color:white;padding:1px 5px;border-radius:3px;">第${bin}便</span>`:''}</div><div class="stop-addr">${loc.addr}</div>${loc.items||loc.vol?`<div class="stop-meta">${loc.items?loc.items+'個':''}${loc.vol?' / '+loc.vol+'才':''}</div>`:''}`;
+    div.onclick=()=>{map.panTo({lat:loc.lat,lng:loc.lng});map.setZoom(16);};
+    list.appendChild(div);
+  });
+}
+
+// ===== サイドバー =====
+function updateSidebar(locs, isOptimal) {
+  document.getElementById('sidebar-title').textContent = isOptimal ? `最適配送順序（${locs.length}件）` : `配送先リスト（${locs.length}件）`;
+  const list = document.getElementById('stop-list');
+  list.innerHTML = '';
+  locs.forEach((loc, i) => {
+    const locIdx = locations.indexOf(loc);
+    const asgn = assignments[locIdx];
+    const driverIdx = asgn ? drivers.findIndex(d=>d.id===asgn.driverId) : -1;
+    const color = driverIdx>=0 ? DRIVER_COLORS[driverIdx%DRIVER_COLORS.length] : null;
+    const driverName = driverIdx>=0 ? drivers[driverIdx].name : null;
+    const div = document.createElement('div');
+    div.className = 'stop-item';
+    if (color) div.style.borderLeft = `4px solid ${color}`;
+    div.innerHTML = `<div class="stop-header"><span class="stop-num ${isOptimal?'optimal':''}">${i+1}</span><span class="stop-name">${loc.name}</span>${driverName?`<span style="margin-left:auto;font-size:10px;background:${color};color:white;padding:1px 5px;border-radius:3px;">${driverName}${asgn.bin?' '+asgn.bin+'便':''}</span>`:''}</div><div class="stop-addr">${loc.addr}</div>${loc.items||loc.vol?`<div class="stop-meta">${loc.items?loc.items+'個':''}${loc.vol?' / '+loc.vol+'才':''}</div>`:''}`;
+    div.onclick=()=>{map.panTo({lat:loc.lat,lng:loc.lng});map.setZoom(16);};
+    list.appendChild(div);
+  });
+}
+
+// ===== ルート =====
+function drawRoute() {
+  if (locations.length<2) { alert('配送先を2件以上読み込んでください'); return; }
+  if (routeLine) routeLine.setMap(null);
+  const routeIdx = nearestNeighbor(locations, DEPOT);
+  orderedLocations = routeIdx.map(i=>locations[i]);
+  routeLine = new google.maps.Polyline({ path: [{lat:DEPOT.lat,lng:DEPOT.lng},...orderedLocations.map(l=>({lat:l.lat,lng:l.lng})),{lat:DEPOT.lat,lng:DEPOT.lng}], geodesic:true, strokeColor:'#1D9E75', strokeOpacity:0.85, strokeWeight:3 });
+  routeLine.setMap(map);
+  markers.forEach(m=>m.setMap(null)); markers=[];
+  orderedLocations.forEach((loc,i)=>{
+    const locIdx=locations.indexOf(loc); const asgn=assignments[locIdx];
+    const driverIdx=asgn?drivers.findIndex(d=>d.id===asgn.driverId):-1;
+    const fillColor=driverIdx>=0?DRIVER_COLORS[driverIdx%DRIVER_COLORS.length]:'#1D9E75';
+    const marker=new google.maps.Marker({ position:{lat:loc.lat,lng:loc.lng}, map, title:loc.name, label:{text:String(i+1),color:'white',fontSize:'11px',fontWeight:'bold'}, icon:{path:google.maps.SymbolPath.CIRCLE,scale:14,fillColor,fillOpacity:1,strokeColor:'#fff',strokeWeight:2} });
+    marker.addListener('click',()=>new google.maps.InfoWindow({content:`<b>${i+1}番目: ${loc.name}</b><br><small>${loc.addr}</small><br><small>担当: ${driverIdx>=0?drivers[driverIdx].name:'未割当'}</small>`}).open(map,marker));
+    markers.push(marker);
+  });
+  updateSidebar(orderedLocations,true);
+  document.getElementById('status').textContent='最適ルートを表示しました';
+  const bounds=new google.maps.LatLngBounds();
+  bounds.extend({lat:DEPOT.lat,lng:DEPOT.lng});
+  orderedLocations.forEach(l=>bounds.extend({lat:l.lat,lng:l.lng}));
+  map.fitBounds(bounds);
+}
+
+function clearRoute() {
+  if (routeLine) { routeLine.setMap(null); routeLine=null; }
+  markers.forEach(m=>m.setMap(null)); markers=[];
+  locations.forEach((loc,i)=>{
+    const asgn=assignments[i]; const driverIdx=asgn?drivers.findIndex(d=>d.id===asgn.driverId):-1;
+    const fillColor=driverIdx>=0?DRIVER_COLORS[driverIdx%DRIVER_COLORS.length]:'#e74c3c';
+    const marker=new google.maps.Marker({ position:{lat:loc.lat,lng:loc.lng}, map, title:loc.name, label:{text:String(i+1),color:'white',fontSize:'11px',fontWeight:'bold'}, icon:{path:google.maps.SymbolPath.CIRCLE,scale:14,fillColor,fillOpacity:1,strokeColor:'#fff',strokeWeight:2} });
+    markers.push(marker);
+  });
+  updateSidebar(locations,false); orderedLocations=[];
+  document.getElementById('status').textContent=`${locations.length}件を表示しました`;
+}
+
+// ===== ドライバー管理 =====
+function openDriverPanel() { renderDriverList(); document.getElementById('driver-panel').style.display='block'; document.getElementById('overlay').style.display='block'; }
+function renderDriverList() {
+  const c=document.getElementById('driver-list-container'); c.innerHTML='';
+  if (drivers.length===0) { c.innerHTML='<p style="font-size:12px;color:#aaa;margin-bottom:8px;">ドライバーが登録されていません</p>'; return; }
+  drivers.forEach((d,idx)=>{
+    const color=DRIVER_COLORS[idx%DRIVER_COLORS.length];
+    const div=document.createElement('div'); div.className='driver-list-item';
+    div.innerHTML=`<span style="width:12px;height:12px;border-radius:50%;background:${color};display:inline-block;margin-right:8px;"></span><span style="flex:1;">${d.name}</span><button class="ddel" onclick="removeDriver(${d.id})">削除</button>`;
+    c.appendChild(div);
+  });
+}
+function addDriver() {
+  const input=document.getElementById('driver-name-input'); const name=input.value.trim();
+  if (!name) return;
+  drivers.push({id:Date.now(),name}); saveDrivers(); input.value=''; renderDriverList();
+}
+function removeDriver(id) {
+  drivers=drivers.filter(d=>d.id!==id);
+  Object.keys(assignments).forEach(k=>{if(assignments[k].driverId===id)delete assignments[k];});
+  saveDrivers(); renderDriverList();
+}
+
+// ===== 配車割り当て =====
+function openAssignPanel() {
+  if (locations.length===0) { alert('先にExcelを読み込んでください'); return; }
+  if (drivers.length===0)   { alert('先にドライバーを登録してください'); return; }
+  renderAssignPanel(); document.getElementById('assign-panel').style.display='block'; document.getElementById('overlay').style.display='block';
+}
+function renderAssignPanel() {
+  const totalItems=locations.reduce((s,l)=>s+(Number(l.items)||0),0);
+  document.getElementById('assign-summary').textContent=`配送先: ${locations.length}件 / 合計個数: ${totalItems}個 / ドライバー: ${drivers.length}名`;
+  const content=document.getElementById('assign-content'); content.innerHTML='';
+  drivers.forEach((driver,dIdx)=>{
+    const color=DRIVER_COLORS[dIdx%DRIVER_COLORS.length];
+    const myLocs=locations.map((loc,i)=>({loc,i})).filter(({i})=>assignments[i]&&assignments[i].driverId===driver.id);
+    const myItems=myLocs.reduce((s,{loc})=>s+(Number(loc.items)||0),0);
+    const myVol=myLocs.reduce((s,{loc})=>s+(Number(loc.vol)||0),0);
+    const block=document.createElement('div'); block.className='assign-driver-block'; block.style.borderColor=color;
+    block.innerHTML=`<div class="assign-driver-header" style="background:${color}20;border-bottom:1px solid ${color}40;"><span><span style="width:12px;height:12px;border-radius:50%;background:${color};display:inline-block;margin-right:6px;"></span>${driver.name}</span><span class="assign-driver-meta">${myLocs.length}件 / ${myItems}個 / ${myVol.toFixed(1)}才</span></div><div class="assign-driver-body" id="driver-body-${driver.id}">${myLocs.length===0?'<p style="font-size:11px;color:#aaa;">未割当</p>':''}</div>`;
+    content.appendChild(block);
+    const body=document.getElementById(`driver-body-${driver.id}`);
+    myLocs.forEach(({loc,i})=>{
+      const bin=assignments[i]?assignments[i].bin:1;
+      const item=document.createElement('div'); item.className='assign-stop-item';
+      item.innerHTML=`<span class="asn">${loc.name}</span><span class="asm">${loc.items?loc.items+'個':''}</span><select onchange="changeAssignment(${i},'${driver.id}',this.value)"><option value="1" ${bin==1?'selected':''}>第1便</option><option value="2" ${bin==2?'selected':''}>第2便</option></select><button onclick="removeAssignment(${i})" style="background:#e74c3c;color:white;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;font-size:11px;">×</button>`;
+      body.appendChild(item);
+    });
+  });
+  const unassigned=locations.map((loc,i)=>({loc,i})).filter(({i})=>!assignments[i]);
+  if (unassigned.length>0) {
+    const block=document.createElement('div'); block.className='assign-driver-block';
+    block.innerHTML=`<div class="assign-driver-header" style="background:#eee;"><span>⬜ 未割り当て</span><span class="assign-driver-meta">${unassigned.length}件</span></div><div class="assign-driver-body" id="unassigned-body"></div>`;
+    content.appendChild(block);
+    const body=document.getElementById('unassigned-body');
+    unassigned.forEach(({loc,i})=>{
+      const item=document.createElement('div'); item.className='assign-stop-item';
+      item.innerHTML=`<span class="asn">${loc.name}</span><span class="asm">${loc.items?loc.items+'個':''}</span><select onchange="assignToDriver(${i},this.value)"><option value="">-- 担当者 --</option>${drivers.map(d=>`<option value="${d.id}">${d.name}</option>`).join('')}</select>`;
+      body.appendChild(item);
+    });
+  }
+}
+function changeAssignment(locIdx,driverId,bin) { assignments[locIdx]={driverId:parseInt(driverId)||driverId,bin:parseInt(bin)}; renderAssignPanel(); }
+function removeAssignment(locIdx) { delete assignments[locIdx]; renderAssignPanel(); }
+function assignToDriver(locIdx,driverId) { if(!driverId) return; assignments[locIdx]={driverId:parseInt(driverId)||driverId,bin:1}; renderAssignPanel(); }
+
+function autoAssign() {
+  if (drivers.length===0) { alert('ドライバーを先に登録してください'); return; }
+  const sorted=locations.map((loc,i)=>({loc,i,items:Number(loc.items)||0})).sort((a,b)=>b.items-a.items);
+  const totals=drivers.map(()=>0); assignments={};
+  sorted.forEach(({i,items})=>{
+    const minIdx=totals.indexOf(Math.min(...totals));
+    assignments[i]={driverId:drivers[minIdx].id,bin:1}; totals[minIdx]+=items;
+  });
+  renderAssignPanel(); document.getElementById('status').textContent='自動振り分け完了（手動で調整できます）';
+}
+
+function applyAssign() {
+  closeAllPanels();
+  markers.forEach(m=>m.setMap(null)); markers=[];
+  const locs=orderedLocations.length>0?orderedLocations:locations;
+  locs.forEach((loc,i)=>{
+    const locIdx=locations.indexOf(loc); const asgn=assignments[locIdx];
+    const driverIdx=asgn?drivers.findIndex(d=>d.id===asgn.driverId):-1;
+    const fillColor=driverIdx>=0?DRIVER_COLORS[driverIdx%DRIVER_COLORS.length]:'#e74c3c';
+    const marker=new google.maps.Marker({ position:{lat:loc.lat,lng:loc.lng}, map, title:loc.name, label:{text:String(i+1),color:'white',fontSize:'11px',fontWeight:'bold'}, icon:{path:google.maps.SymbolPath.CIRCLE,scale:14,fillColor,fillOpacity:1,strokeColor:'#fff',strokeWeight:2} });
+    const dName=driverIdx>=0?drivers[driverIdx].name:'未割当';
+    const binStr=asgn&&asgn.bin?` / 第${asgn.bin}便`:'';
+    marker.addListener('click',()=>new google.maps.InfoWindow({content:`<b>${loc.name}</b><br><small>${loc.addr}</small><br><small>担当: ${dName}${binStr}</small>`}).open(map,marker));
+    markers.push(marker);
+  });
+  updateSidebar(locs,orderedLocations.length>0);
+  if (currentTab==='driver') renderDriverTab();
+  document.getElementById('status').textContent='配車割り当てを地図に反映しました';
+}
+
+// ===== Supabase共有 =====
+async function openSharePanel() {
+  if (locations.length===0) { alert('先にExcelを読み込んでください'); return; }
+  if (drivers.length===0)   { alert('先にドライバーを登録してください'); return; }
+  const content=document.getElementById('share-content');
+  content.innerHTML='<p style="font-size:13px;color:#888;">Supabaseに保存中...</p>';
+  document.getElementById('share-panel').style.display='block';
+  document.getElementById('overlay').style.display='block';
+
+  try {
+    // 既存データ削除（同日・同部署）
+    if (currentDeliveryId) {
+      await sbClient.from('deliveries').delete().eq('id', currentDeliveryId);
+    }
+
+    // deliveriesテーブルに保存
+    const { data: delData, error: delErr } = await sbClient
+      .from('deliveries')
+      .insert({ busho: currentBusho, delivery_date: currentDate })
+      .select().single();
+    if (delErr) throw delErr;
+    currentDeliveryId = delData.id;
+
+    // delivery_stopsに全店舗を保存
+    const stops = locations.map((loc, i) => {
+      const asgn = assignments[i];
+      const driverIdx = asgn ? drivers.findIndex(d=>d.id===asgn.driverId) : -1;
+      return {
+        delivery_id: currentDeliveryId,
+        stop_order: i + 1,
+        name: loc.name,
+        address: loc.addr,
+        lat: loc.lat,
+        lng: loc.lng,
+        items: loc.items ? Number(loc.items) : null,
+        vol: loc.vol ? Number(loc.vol) : null,
+        driver_id: asgn ? String(asgn.driverId) : null,
+        driver_name: driverIdx >= 0 ? drivers[driverIdx].name : null,
+        bin: asgn ? asgn.bin : null,
+        status: 'pending'
+      };
+    });
+
+    const { error: stopsErr } = await sbClient.from('delivery_stops').insert(stops);
+    if (stopsErr) throw stopsErr;
+
+    // ドライバーごとのURLを生成
+    const baseUrl = window.location.href.replace('index.html','') + 'driver.html';
+    let html = `<p style="font-size:12px;color:#27ae60;font-weight:bold;margin-bottom:10px;">✅ 保存完了！ドライバーに以下のURLを共有してください</p>`;
+
+    drivers.forEach(driver => {
+      const myLocs = locations.filter((_,i) => assignments[i] && assignments[i].driverId === driver.id);
+      if (myLocs.length === 0) return;
+      const url = `${baseUrl}?delivery=${currentDeliveryId}&driver=${encodeURIComponent(driver.name)}`;
+      html += `<div class="share-driver-item">
+        <div>
+          <div style="font-weight:bold;font-size:13px;">${driver.name}</div>
+          <div style="font-size:11px;color:#888;">${myLocs.length}件</div>
+        </div>
+        <button class="copy-btn" onclick="copyUrl('${url}','${driver.name}')">URLをコピー</button>
+      </div>`;
+    });
+
+    html += `<div style="margin-top:12px;padding:10px;background:#fff8e1;border-radius:6px;font-size:12px;color:#856404;">
+      💡 ドライバーはAndroidスマホでURLを開くだけで自分の配送先が確認できます
+    </div>`;
+    content.innerHTML = html;
+
+  } catch(err) {
+    content.innerHTML = `<p style="color:#e74c3c;font-size:13px;">エラー: ${err.message}</p>`;
+  }
+}
+
+function copyUrl(url, name) {
+  navigator.clipboard.writeText(url).then(()=>{ alert(`${name}のURLをコピーしました`); }).catch(()=>{ prompt('URLをコピーしてください:', url); });
+}
+
+// ===== Excel出力 =====
+function exportAllDrivers() {
+  if (locations.length===0) { alert('データがありません'); return; }
+  const deliveryDate=getDeliveryDate(currentDate,currentBusho); const bushoName=currentBusho===1?'部署1':'部署2';
+  const wb=XLSX.utils.book_new();
+  drivers.forEach((driver,dIdx)=>{
+    [1,2].forEach(bin=>{
+      const myLocs=locations.map((loc,i)=>({loc,i})).filter(({i})=>assignments[i]&&assignments[i].driverId===driver.id&&assignments[i].bin===bin);
+      if (myLocs.length===0) return;
+      const wsData=[
+        [`配送ルート表 【${driver.name} / 第${bin}便】`],
+        [`配送日: ${deliveryDate}　【${bushoName}】`],[],
+        ['順番','店舗名','住所','個数','才数','備考']
+      ];
+      wsData.push(['',DEPOT.name,DEPOT.addr,'','','出発']);
+      myLocs.forEach(({loc},idx)=>wsData.push([idx+1,loc.name,loc.addr,loc.items!==null?loc.items:'',loc.vol!==null?loc.vol:'','']));
+      wsData.push(['',DEPOT.name,DEPOT.addr,'','','帰着']);
+      wsData.push([],['合計','','',myLocs.reduce((s,{loc})=>s+(Number(loc.items)||0),0),myLocs.reduce((s,{loc})=>s+(Number(loc.vol)||0),0).toFixed(1),'']);
+      const ws=XLSX.utils.aoa_to_sheet(wsData); ws['!cols']=[{wch:6},{wch:35},{wch:45},{wch:8},{wch:8},{wch:8}];
+      XLSX.utils.book_append_sheet(wb,ws,`${driver.name}_${bin}便`.slice(0,31));
+    });
+  });
+  if (wb.SheetNames.length===0) { alert('割り当てデータがありません'); return; }
+  XLSX.writeFile(wb,`配車表_${currentBusho===1?'部署1':'部署2'}_${currentDate}.xlsx`);
+}
+
+function exportExcel() {
+  const locs=orderedLocations.length>0?orderedLocations:locations;
+  if (locs.length===0) { alert('先にExcelを読み込んでください'); return; }
+  const deliveryDate=getDeliveryDate(currentDate,currentBusho); const bushoName=currentBusho===1?'部署1':'部署2';
+  const wsData=[['配送ルート表'],[`配送日: ${deliveryDate}　【${bushoName}】`],[],['順番','店舗名','住所','個数','才数','担当ドライバー','便']];
+  wsData.push(['',DEPOT.name,DEPOT.addr,'','','','出発']);
+  locs.forEach((loc,i)=>{
+    const locIdx=locations.indexOf(loc); const asgn=assignments[locIdx];
+    const driverIdx=asgn?drivers.findIndex(d=>d.id===asgn.driverId):-1;
+    wsData.push([i+1,loc.name,loc.addr,loc.items!==null?loc.items:'',loc.vol!==null?loc.vol:'',driverIdx>=0?drivers[driverIdx].name:'',asgn?`第${asgn.bin}便`:'']);
+  });
+  wsData.push(['',DEPOT.name,DEPOT.addr,'','','','帰着']);
+  wsData.push([],['合計','','',locs.reduce((s,l)=>s+(Number(l.items)||0),0),locs.reduce((s,l)=>s+(Number(l.vol)||0),0).toFixed(1),'','']);
+  const ws=XLSX.utils.aoa_to_sheet(wsData); ws['!cols']=[{wch:6},{wch:35},{wch:45},{wch:8},{wch:8},{wch:14},{wch:6}];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'配送ルート');
+  XLSX.writeFile(wb,`配送ルート_${bushoName}_${currentDate}.xlsx`);
+}
+
+// ===== ユーティリティ =====
+function closeAllPanels() {
+  ['driver-panel','assign-panel','share-panel'].forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById('overlay').style.display='none';
+}
+function dist(a,b) { const R=111,dlat=(b.lat-a.lat)*R,dlng=(b.lng-a.lng)*R*Math.cos((a.lat+b.lat)/2*Math.PI/180); return Math.sqrt(dlat*dlat+dlng*dlng); }
+function nearestNeighbor(locs,start) {
+  const n=locs.length,visited=new Array(n).fill(false),route=[];
+  let cur=start;
+  for(let i=0;i<n;i++){let best=-1,bd=Infinity;for(let j=0;j<n;j++){if(!visited[j]){const d=dist(cur,locs[j]);if(d<bd){bd=d;best=j;}}}visited[best]=true;route.push(best);cur=locs[best];}
+  return route;
+}
+
+loadDrivers();
+checkSupabase();
+</script>
+
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBP4DqTiYGVyDZv4mwguXoHYfcpHt4kO8E&callback=initMap" async defer></script>
+</body>
+</html>
