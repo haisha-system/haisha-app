@@ -919,7 +919,7 @@ function exportExcel() {
 
 // ===== ユーティリティ =====
 function closeAllPanels() {
-  ['driver-panel','assign-panel'].forEach(id=>document.getElementById(id).style.display='none');
+  const ap=document.getElementById('assign-panel'); if(ap) ap.style.display='none';
   document.getElementById('overlay').style.display='none';
 }
 function dist(a,b) { const R=111,dlat=(b.lat-a.lat)*R,dlng=(b.lng-a.lng)*R*Math.cos((a.lat+b.lat)/2*Math.PI/180); return Math.sqrt(dlat*dlat+dlng*dlng); }
