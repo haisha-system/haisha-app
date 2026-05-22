@@ -917,15 +917,19 @@ function filterRouteByDriver(driverId) {
       const routeIdx = nearestNeighbor(locs, DEPOT);
       routeIdx.forEach(ri => {
         stopNum++;
+        const sn = stopNum;
         const loc = locs[ri];
         const marker = new google.maps.Marker({
           position:{lat:loc.lat,lng:loc.lng}, map, title:loc.name,
-          label:{text:String(stopNum),color:'white',fontSize:'11px',fontWeight:'bold'},
+          label:{text:String(sn),color:'white',fontSize:'11px',fontWeight:'bold'},
           icon:{path:google.maps.SymbolPath.CIRCLE,scale:14,fillColor:color,fillOpacity:1,strokeColor:'#fff',strokeWeight:2}
         });
-        marker.addListener('click', () => new google.maps.InfoWindow({
-          content:`<b>${stopNum}番目: ${loc.name}</b><br><small>${loc.addr}</small><br><small>担当: ${dName} / 第${bin}便</small>`
-        }).open(map, marker));
+        marker.addListener('click', () => {
+          highlightStopCard(locations.indexOf(loc));
+          new google.maps.InfoWindow({
+            content:`<b>${sn}番目: ${loc.name}</b><br><small>${loc.addr}</small><br><small>担当: ${dName} / 第${bin}便</small>`
+          }).open(map, marker);
+        });
         markers.push(marker);
       });
     });
