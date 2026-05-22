@@ -814,6 +814,7 @@ function drawRoute() {
         label:{text:String(i+1),color:'white',fontSize:'11px',fontWeight:'bold'},
         icon:{path:google.maps.SymbolPath.CIRCLE,scale:14,fillColor:'#1D9E75',fillOpacity:1,strokeColor:'#fff',strokeWeight:2}
       });
+      marker.addListener('click', () => highlightStopCard(locations.indexOf(loc)));
       markers.push(marker);
     });
     document.getElementById('status').textContent = `全${orderedLocations.length}件のルートを表示しました（割り当てなし）`;
@@ -856,9 +857,12 @@ function drawRoute() {
             label:{text:String(totalStops),color:'white',fontSize:'10px',fontWeight:'bold'},
             icon:{path:google.maps.SymbolPath.CIRCLE,scale:13,fillColor:color,fillOpacity:1,strokeColor:'#fff',strokeWeight:2}
           });
-          marker.addListener('click', () => new google.maps.InfoWindow({
-            content:`<b>${totalStops}番目: ${loc.name}</b><br><small>${loc.addr}</small><br><small>担当: ${driverName} / 第${bin}便</small>`
-          }).open(map, marker));
+          marker.addListener('click', () => {
+            highlightStopCard(locations.indexOf(loc));
+            new google.maps.InfoWindow({
+              content:`<b>${totalStops}番目: ${loc.name}</b><br><small>${loc.addr}</small><br><small>担当: ${driverName} / 第${bin}便</small>`
+            }).open(map, marker);
+          });
           markers.push(marker);
           driverLocs.push(loc);
         });
@@ -1175,6 +1179,31 @@ function exportExcel() {
 let rightTab = 'all';
 let draggedLocIdx = null;
 
+
+// ===== カード・マーカーのハイライト =====
+function highlightStopCard(locIdx) {
+  // 全カードのハイライトを解除
+  document.querySelectorAll('.stop-card').forEach(c => c.style.outline = '');
+  // 対象カードをハイライト
+  document.querySelectorAll('.stop-card').forEach(c => {
+    if (parseInt(c.dataset.locIdx) === locIdx) {
+      c.style.outline = '2px solid #3b82f6';
+      c.scrollIntoView({block:'nearest', behavior:'smooth'});
+    }
+  });
+}
+
+function highlightMarker(targetLoc) {
+  // マーカーを一時的に大きくする
+  markers.forEach(m => {
+    if (m.getTitle() === targetLoc.name) {
+      const origIcon = m.getIcon();
+      m.setIcon({...origIcon, scale:18});
+      setTimeout(() => m.setIcon(origIcon), 1500);
+    }
+  });
+}
+
 function unassignStop(locIdx) {
   delete assignments[locIdx];
   saveLocationsToSession();
@@ -1260,13 +1289,10 @@ function renderRightSidebar() {
     const dName = driverIdx >= 0 ? drivers[driverIdx].name : '未割当';
     const bin = asgn ? `第${asgn.bin}便` : '';
 
-    // ルート表示済みの場合、orderedLocationsから番号を取得
-    const stopNumStr = orderedLocations.length > 0 && activeDriverFilter !== 'unassigned'
-      ? (() => {
-          const pos = orderedLocations.indexOf(loc);
-          return pos >= 0 ? String(pos+1) : '';
-        })()
-      : '';
+    // 番号はlocs配列内の位置を使う
+    const locsPos = locs.indexOf(locs.find(x => x.i === i));
+    const stopNumStr = locsPos >= 0 && activeDriverFilter !== 'unassigned' && orderedLocations.length > 0
+      ? String(locsPos + 1) : '';
     card.innerHTML = `
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;">
         <div style="flex:1;min-width:0;">
@@ -1296,10 +1322,12 @@ function renderRightSidebar() {
       draggedLocIdx = null;
     });
 
-    // クリックで地図を中央に
-    card.addEventListener('click', () => {
-      map.panTo({lat: loc.lat, lng: loc.lng});
-      map.setZoom(15);
+    // クリックでカードハイライト
+    card.addEventListener('click', (e) => {
+      if (e.target.tagName === 'BUTTON') return; // 解除ボタンは除く
+      highlightStopCard(i);
+      // 地図上のマーカーをハイライト
+      highlightMarker(loc);
     });
 
     el.appendChild(card);
@@ -1378,6 +1406,24 @@ function renderDriverSidebar() {
     activeDriverFilter = 'unassigned';
     routeLines.forEach(({line}) => line.setMap(null));
     markers.forEach(m => m.setMap(null));
+    markers = [];
+    // 未割当のピンを表示
+    const unLocs = locations.filter((_, i) => !assignments[i]);
+    unLocs.forEach((loc, idx) => {
+      const marker = new google.maps.Marker({
+        position:{lat:loc.lat,lng:loc.lng}, map, title:loc.name,
+        label:{text:String(idx+1),color:'white',fontSize:'11px',fontWeight:'bold'},
+        icon:{path:google.maps.SymbolPath.CIRCLE,scale:14,fillColor:'#f59e0b',fillOpacity:1,strokeColor:'#fff',strokeWeight:2}
+      });
+      marker.addListener('click', () => {
+        highlightStopCard(locations.indexOf(loc));
+        new google.maps.InfoWindow({content:`<b>${loc.name}</b><br><small>${loc.addr}</small>`}).open(map, marker);
+      });
+      markers.push(marker);
+    });
+    const bounds = new google.maps.LatLngBounds();
+    unLocs.forEach(l => bounds.extend({lat:l.lat,lng:l.lng}));
+    if (unLocs.length > 0) map.fitBounds(bounds);
     document.getElementById('status').textContent = `未割当: ${unassignedCount}件`;
     renderDriverSidebar();
     renderRightSidebar();
