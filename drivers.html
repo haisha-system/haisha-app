@@ -139,6 +139,20 @@
         </div>
         <div class="form-row">
           <div class="form-group">
+            <label>所属運送会社</label>
+            <select id="new-carrier" onchange="updateYoizumiOptions()">
+              <option value="">自社（メープルツリー）</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>宵積み出発地（通常と異なる場合）</label>
+            <select id="new-yoizumi">
+              <option value="">なし（デポから出発）</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
             <label>電話番号</label>
             <input type="tel" id="new-phone" placeholder="090-0000-0000">
           </div>
@@ -210,6 +224,8 @@ function renderList() {
     const depotLabel= DEPOT_LABEL[d.depot||'both'];
     const initial   = d.name.replace(/\s/g,'').slice(-1) || '?';
     const line2parts= [];
+    if (d.carrier) line2parts.push('🏢'+getCarrierName(d.carrier));
+    if (d.yoizumi) line2parts.push('🌙宵積:'+getDepotName(d.yoizumi));
     if (d.vehicle) line2parts.push('🚛'+d.vehicle);
     if (d.area)    line2parts.push('📍'+d.area);
     if (d.phone)   line2parts.push('📞'+d.phone);
@@ -245,6 +261,8 @@ function addDriver() {
   const vehicle = document.getElementById('new-vehicle').value.trim();
   const phone   = document.getElementById('new-phone').value.trim();
   const area    = document.getElementById('new-area').value.trim();
+  const carrier  = document.getElementById('new-carrier').value;
+  const yoizumi  = document.getElementById('new-yoizumi').value;
   const note    = document.getElementById('new-note').value.trim();
   if (!name) { alert('氏名は必須です'); return; }
   if (!code) { alert('社員コードは必須です'); return; }
@@ -258,7 +276,7 @@ function addDriver() {
     showToast('更新しました');
   } else {
     if (drivers.find(d => d.code === code && d.id !== editId)) { alert('この社員コードは既に使用されています'); return; }
-    drivers.push({ id: Date.now(), name, code, depot, vehicle, phone, area, note });
+    drivers.push({ id: Date.now(), name, code, depot, vehicle, phone, area, carrier, yoizumi, note });
     showToast(`${name} を登録しました`);
   }
   saveDrivers(); renderList(); clearForm();
@@ -273,6 +291,8 @@ function editDriver(id) {
   document.getElementById('new-vehicle').value = d.vehicle || '';
   document.getElementById('new-phone').value   = d.phone || '';
   document.getElementById('new-area').value    = d.area || '';
+  document.getElementById('new-carrier').value  = d.carrier || '';
+  setTimeout(()=>{ updateYoizumiOptions(); document.getElementById('new-yoizumi').value = d.yoizumi || ''; },100);
   document.getElementById('new-note').value    = d.note || '';
   document.getElementById('form-title').textContent = `編集: ${d.name}`;
   document.getElementById('form-title').dataset.editId = d.id;
@@ -288,7 +308,9 @@ function deleteDriver(id) {
 
 function clearForm() {
   ['new-name','new-code','new-vehicle','new-phone','new-area','new-note'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('new-depot').value = 'both';
+  document.getElementById('new-depot').value   = 'both';
+  document.getElementById('new-carrier').value  = '';
+  document.getElementById('new-yoizumi').value  = '';
   document.getElementById('form-title').textContent = '新規登録';
   document.getElementById('form-title').dataset.editId = '';
 }
@@ -299,7 +321,48 @@ function showToast(msg) {
   setTimeout(() => t.style.display = 'none', 2500);
 }
 
-loadDrivers(); renderList();
+function getCarrierName(id) {
+  try {
+    const depots = JSON.parse(localStorage.getItem('haisha_depots')||'[]');
+    const d = depots.find(x=>String(x.id)===String(id));
+    return d ? d.name : id;
+  } catch(e){ return id; }
+}
+function getDepotName(id) {
+  try {
+    const depots = JSON.parse(localStorage.getItem('haisha_depots')||'[]');
+    const d = depots.find(x=>String(x.id)===String(id));
+    return d ? d.name : id;
+  } catch(e){ return id; }
+}
+function updateYoizumiOptions() {
+  try {
+    const depots = JSON.parse(localStorage.getItem('haisha_depots')||'[]');
+    // 運送会社セレクト更新
+    const csel = document.getElementById('new-carrier');
+    const cval = csel.value;
+    csel.innerHTML = '<option value="">自社（メープルツリー）</option>';
+    depots.filter(d=>d.type==='own'||d.type==='carrier').forEach(d=>{
+      const opt=document.createElement('option');
+      opt.value=d.id; opt.textContent=d.name;
+      csel.appendChild(opt);
+    });
+    csel.value = cval;
+    // 宵積みセレクト更新（全拠点＋運送会社）
+    const ysel = document.getElementById('new-yoizumi');
+    const yval = ysel.value;
+    ysel.innerHTML = '<option value="">なし（デポから出発）</option>';
+    depots.forEach(d=>{
+      const opt=document.createElement('option');
+      opt.value=d.id; opt.textContent=d.name+(d.addr?' ('+d.addr.slice(0,15)+'...)':'');
+      ysel.appendChild(opt);
+    });
+    ysel.value = yval;
+  } catch(e){}
+}
+loadDrivers();
+updateYoizumiOptions();
+renderList();
 </script>
 </body>
 </html>
