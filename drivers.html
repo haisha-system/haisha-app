@@ -324,11 +324,11 @@ function showToast(msg) {
 
 function toggleAvailable(id, val) {
   const d = drivers.find(x=>x.id===id);
-  if (d) { d.availableToday = val; saveDrivers(); }
+  if (d) { d.availableToday = val; saveDrivers(); updateStats(); renderList(); }
 }
 function toggleYoizumi(id, val) {
   const d = drivers.find(x=>x.id===id);
-  if (d) { d.yoizumiToday = val; saveDrivers(); }
+  if (d) { d.yoizumiToday = val; saveDrivers(); renderList(); }
 }
 function getCarrierName(id) {
   try {
