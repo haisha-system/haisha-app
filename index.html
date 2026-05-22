@@ -678,7 +678,12 @@ function renderDriverTab() {
       const color = d.id===-1 ? '#95a5a6' : DRIVER_COLORS[drivers.findIndex(x=>x.id===d.id)%DRIVER_COLORS.length];
       btn.style.background = color; btn.style.borderColor = color; btn.style.color='white';
     }
-    btn.onclick = () => { selectedDriverTab = idx; renderDriverTab(); };
+    btn.onclick = () => {
+      selectedDriverTab = idx;
+      renderDriverTab();
+      // ルート表示中ならドライバーフィルター適用
+      if (routeLines.length > 0 && d.id !== -1) filterRouteByDriver(d.id);
+    };
     bar.appendChild(btn);
   });
   const selTab = tabs[selectedDriverTab];
@@ -725,37 +730,151 @@ function updateSidebar(locs, isOptimal) {
 }
 
 // ===== ルート =====
+// 複数ルートライン管理
+let routeLines = []; // 全ルートライン
+let activeDriverFilter = null; // null=全員表示
+
 function drawRoute() {
-  if (locations.length<2) { alert('配送先を2件以上読み込んでください'); return; }
-  if (routeLine) routeLine.setMap(null);
-  const routeIdx = nearestNeighbor(locations, DEPOT);
-  orderedLocations = routeIdx.map(i=>locations[i]);
-  routeLine = new google.maps.Polyline({ path: [{lat:DEPOT.lat,lng:DEPOT.lng},...orderedLocations.map(l=>({lat:l.lat,lng:l.lng})),{lat:DEPOT.lat,lng:DEPOT.lng}], geodesic:true, strokeColor:'#1D9E75', strokeOpacity:0.85, strokeWeight:3 });
-  routeLine.setMap(map);
-  markers.forEach(m=>m.setMap(null)); markers=[];
-  orderedLocations.forEach((loc,i)=>{
-    const locIdx=locations.indexOf(loc); const asgn=assignments[locIdx];
-    const driverIdx=asgn?drivers.findIndex(d=>d.id===asgn.driverId):-1;
-    const fillColor=driverIdx>=0?DRIVER_COLORS[driverIdx%DRIVER_COLORS.length]:'#1D9E75';
-    const marker=new google.maps.Marker({ position:{lat:loc.lat,lng:loc.lng}, map, title:loc.name, label:{text:String(i+1),color:'white',fontSize:'11px',fontWeight:'bold'}, icon:{path:google.maps.SymbolPath.CIRCLE,scale:14,fillColor,fillOpacity:1,strokeColor:'#fff',strokeWeight:2} });
-    marker.addListener('click',()=>new google.maps.InfoWindow({content:`<b>${i+1}番目: ${loc.name}</b><br><small>${loc.addr}</small><br><small>担当: ${driverIdx>=0?drivers[driverIdx].name:'未割当'}</small>`}).open(map,marker));
-    markers.push(marker);
-  });
-  updateSidebar(orderedLocations,true);
-  document.getElementById('status').textContent='最適ルートを表示しました';
-  const bounds=new google.maps.LatLngBounds();
+  if (locations.length < 1) { alert('配送先を読み込んでください'); return; }
+  clearRouteLines();
+  markers.forEach(m => m.setMap(null)); markers = [];
+  orderedLocations = [];
+  activeDriverFilter = null;
+
+  // ドライバーごとにルートを描画
+  const assignedDriverIds = [...new Set(
+    Object.values(assignments).map(a => a.driverId)
+  )];
+
+  if (assignedDriverIds.length === 0) {
+    // 割り当てなし→全店舗を1本のルートで表示
+    const routeIdx = nearestNeighbor(locations, DEPOT);
+    orderedLocations = routeIdx.map(i => locations[i]);
+    const line = new google.maps.Polyline({
+      path: [{lat:DEPOT.lat,lng:DEPOT.lng},...orderedLocations.map(l=>({lat:l.lat,lng:l.lng})),{lat:DEPOT.lat,lng:DEPOT.lng}],
+      geodesic:true, strokeColor:'#1D9E75', strokeOpacity:0.85, strokeWeight:3
+    });
+    line.setMap(map);
+    routeLines.push({ line, driverId: null });
+    orderedLocations.forEach((loc,i) => {
+      const marker = new google.maps.Marker({
+        position:{lat:loc.lat,lng:loc.lng}, map, title:loc.name,
+        label:{text:String(i+1),color:'white',fontSize:'11px',fontWeight:'bold'},
+        icon:{path:google.maps.SymbolPath.CIRCLE,scale:14,fillColor:'#1D9E75',fillOpacity:1,strokeColor:'#fff',strokeWeight:2}
+      });
+      markers.push(marker);
+    });
+    document.getElementById('status').textContent = `全${orderedLocations.length}件のルートを表示しました（割り当てなし）`;
+  } else {
+    // ドライバーごとにルート描画
+    let totalStops = 0;
+    assignedDriverIds.forEach(driverId => {
+      const driverIdx = drivers.findIndex(d => d.id === driverId);
+      const color = driverIdx >= 0 ? DRIVER_COLORS[driverIdx % DRIVER_COLORS.length] : '#aaa';
+      const driverName = driverIdx >= 0 ? drivers[driverIdx].name : '不明';
+
+      // このドライバーの店舗（便順でソート）
+      const driverLocs = [];
+      [1, 2].forEach(bin => {
+        const binLocs = locations.map((loc,i) => ({loc,i}))
+          .filter(({i}) => assignments[i] && assignments[i].driverId === driverId && assignments[i].bin === bin);
+        if (binLocs.length === 0) return;
+
+        // 最近傍法でルート最適化
+        const locs = binLocs.map(({loc}) => loc);
+        const routeIdx = nearestNeighbor(locs, DEPOT);
+        const ordered = routeIdx.map(i => locs[i]);
+
+        const path = [{lat:DEPOT.lat,lng:DEPOT.lng}, ...ordered.map(l=>({lat:l.lat,lng:l.lng})), {lat:DEPOT.lat,lng:DEPOT.lng}];
+        const line = new google.maps.Polyline({
+          path, geodesic:true,
+          strokeColor: color,
+          strokeOpacity: 0.85,
+          strokeWeight: bin === 1 ? 4 : 3,
+          strokePattern: bin === 2 ? [{icon:{path:'M 0,-1 0,1',strokeOpacity:1,scale:3},offset:'0',repeat:'12px'}] : null
+        });
+        line.setMap(map);
+        routeLines.push({ line, driverId, bin });
+
+        // マーカー描画
+        ordered.forEach((loc, stopIdx) => {
+          const marker = new google.maps.Marker({
+            position:{lat:loc.lat,lng:loc.lng}, map, title:loc.name,
+            label:{text:String(stopIdx+1),color:'white',fontSize:'10px',fontWeight:'bold'},
+            icon:{path:google.maps.SymbolPath.CIRCLE,scale:13,fillColor:color,fillOpacity:1,strokeColor:'#fff',strokeWeight:2}
+          });
+          marker.addListener('click', () => new google.maps.InfoWindow({
+            content:`<b>${loc.name}</b><br><small>${loc.addr}</small><br><small>担当: ${driverName} / 第${bin}便</small>`
+          }).open(map, marker));
+          markers.push(marker);
+          driverLocs.push(loc);
+          totalStops++;
+        });
+      });
+      orderedLocations.push(...driverLocs);
+    });
+    document.getElementById('status').textContent = `${assignedDriverIds.length}名・${totalStops}件のルートを表示しました`;
+  }
+
+  // 地図範囲を調整
+  const bounds = new google.maps.LatLngBounds();
   bounds.extend({lat:DEPOT.lat,lng:DEPOT.lng});
-  orderedLocations.forEach(l=>bounds.extend({lat:l.lat,lng:l.lng}));
+  (orderedLocations.length > 0 ? orderedLocations : locations).forEach(l => bounds.extend({lat:l.lat,lng:l.lng}));
   map.fitBounds(bounds);
+
+  updateSidebar(orderedLocations.length > 0 ? orderedLocations : locations, true);
+  if (currentTab === 'driver') renderDriverTab();
+}
+
+function clearRouteLines() {
+  routeLines.forEach(({line}) => line.setMap(null));
+  routeLines = [];
+  if (routeLine) { routeLine.setMap(null); routeLine = null; }
+}
+
+// 特定ドライバーのルートだけ表示
+function filterRouteByDriver(driverId) {
+  if (activeDriverFilter === driverId) {
+    // 同じドライバーをもう一度押したら全員表示に戻す
+    activeDriverFilter = null;
+    routeLines.forEach(({line}) => line.setMap(map));
+    markers.forEach(m => m.setMap(map));
+    document.getElementById('status').textContent = '全ドライバーのルートを表示しました';
+  } else {
+    activeDriverFilter = driverId;
+    routeLines.forEach(({line, driverId: rid}) => {
+      line.setMap(rid === driverId || rid === null ? map : null);
+    });
+    markers.forEach(m => m.setMap(null));
+    // 該当ドライバーのマーカーだけ表示
+    const driverIdx = drivers.findIndex(d => d.id === driverId);
+    const color = driverIdx >= 0 ? DRIVER_COLORS[driverIdx % DRIVER_COLORS.length] : '#aaa';
+    locations.forEach((loc, i) => {
+      const asgn = assignments[i];
+      if (!asgn || asgn.driverId !== driverId) return;
+      const marker = new google.maps.Marker({
+        position:{lat:loc.lat,lng:loc.lng}, map, title:loc.name,
+        icon:{path:google.maps.SymbolPath.CIRCLE,scale:13,fillColor:color,fillOpacity:1,strokeColor:'#fff',strokeWeight:2}
+      });
+      markers.push(marker);
+    });
+    const dName = driverIdx >= 0 ? drivers[driverIdx].name : '不明';
+    document.getElementById('status').textContent = `${dName}のルートを表示中（もう一度押すと全員表示）`;
+  }
 }
 
 function clearRoute() {
-  if (routeLine) { routeLine.setMap(null); routeLine=null; }
+  clearRouteLines();
   markers.forEach(m=>m.setMap(null)); markers=[];
+  activeDriverFilter = null;
   locations.forEach((loc,i)=>{
     const asgn=assignments[i]; const driverIdx=asgn?drivers.findIndex(d=>d.id===asgn.driverId):-1;
     const fillColor=driverIdx>=0?DRIVER_COLORS[driverIdx%DRIVER_COLORS.length]:'#e74c3c';
-    const marker=new google.maps.Marker({ position:{lat:loc.lat,lng:loc.lng}, map, title:loc.name, label:{text:String(i+1),color:'white',fontSize:'11px',fontWeight:'bold'}, icon:{path:google.maps.SymbolPath.CIRCLE,scale:14,fillColor,fillOpacity:1,strokeColor:'#fff',strokeWeight:2} });
+    const marker=new google.maps.Marker({
+      position:{lat:loc.lat,lng:loc.lng}, map, title:loc.name,
+      label:{text:String(i+1),color:'white',fontSize:'11px',fontWeight:'bold'},
+      icon:{path:google.maps.SymbolPath.CIRCLE,scale:14,fillColor,fillOpacity:1,strokeColor:'#fff',strokeWeight:2}
+    });
     markers.push(marker);
   });
   updateSidebar(locations,false); orderedLocations=[];
