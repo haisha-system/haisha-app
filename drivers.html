@@ -24,7 +24,7 @@
     .section-title { font-size: 11px; letter-spacing: 0.15em; color: #10b981; font-weight: 500; margin-bottom: 12px; text-transform: uppercase; }
 
     /* 統計 */
-    .stats-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 16px; }
+    .stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 16px; }
     .stat-card { background: #161f2c; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px 16px; }
     .stat-label { font-size: 11px; color: rgba(255,255,255,0.4); margin-bottom: 4px; }
     .stat-value { font-size: 22px; font-weight: 700; }
@@ -142,7 +142,7 @@
           <div class="form-group">
             <label>所属運送会社</label>
             <select id="new-carrier">
-              <option value="">（選択してください）</option>
+              <option value="">-- 選択してください --</option>
             </select>
           </div>
           <div class="form-group" style="justify-content:flex-end;">
@@ -365,7 +365,7 @@ function updateCarrierOptions() {
     // 運送会社セレクト更新
     const csel = document.getElementById('new-carrier');
     const cval = csel.value;
-    csel.innerHTML = '<option value="">自社（メープルツリー）</option>';
+    csel.innerHTML = '<option value="">-- 選択してください --</option>';
     depots.filter(d=>d.type==='own'||d.type==='carrier').forEach(d=>{
       const opt=document.createElement('option');
       opt.value=d.id; opt.textContent=d.name;
