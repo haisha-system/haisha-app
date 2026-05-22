@@ -1128,6 +1128,54 @@ function closeAllPanels() {
   const ap=document.getElementById('assign-panel'); if(ap) ap.style.display='none';
   document.getElementById('overlay').style.display='none';
 }
+
+function toggleStopList() {
+  const c = document.getElementById('stop-list-content');
+  const icon = document.getElementById('stop-list-toggle-icon');
+  if (!c) return;
+  const isOpen = c.style.display !== 'none';
+  c.style.display = isOpen ? 'none' : 'block';
+  icon.textContent = isOpen ? '▼' : '▲';
+}
+
+function renderDriverSidebar() {
+  const el = document.getElementById('driver-list-sidebar');
+  if (!el) return;
+  el.innerHTML = '';
+  const activeDrivers = drivers.filter(d => d.availableToday !== false);
+  if (activeDrivers.length === 0) {
+    el.innerHTML = '<p style="font-size:11px;color:rgba(255,255,255,0.3);padding:4px 0;">ドライバーが登録されていません<br><a href='drivers.html' style='color:#3b82f6;'>ドライバー管理へ</a></p>';
+    return;
+  }
+  // 全員ボタン
+  const allBtn = document.createElement('div');
+  allBtn.className = 'driver-sb-card' + (activeDriverFilter === null ? ' active' : '');
+  allBtn.style.borderLeft = '3px solid rgba(255,255,255,0.3)';
+  const totalAssigned = Object.keys(assignments).length;
+  allBtn.innerHTML = `<div style="display:flex;align-items:center;"><span class="driver-sb-dot" style="background:rgba(255,255,255,0.3);"></span><span class="driver-sb-name">全員表示</span></div><div class="driver-sb-meta">${activeDrivers.length}名稼働 / ${totalAssigned}件割当済</div>`;
+  allBtn.onclick = () => {
+    activeDriverFilter = null;
+    routeLines.forEach(({line}) => line.setMap(map));
+    markers.forEach(m => m.setMap(map));
+    document.getElementById('status').textContent = '全ドライバーのルートを表示しました';
+    renderDriverSidebar();
+  };
+  el.appendChild(allBtn);
+  // 各ドライバー
+  activeDrivers.forEach(driver => {
+    const driverIdx = drivers.indexOf(driver);
+    const color = DRIVER_COLORS[driverIdx % DRIVER_COLORS.length];
+    const myLocs = locations.filter((_, i) => assignments[i] && assignments[i].driverId === driver.id);
+    const myItems = myLocs.reduce((s, l) => s + (Number(l.items) || 0), 0);
+    const card = document.createElement('div');
+    card.className = 'driver-sb-card' + (activeDriverFilter === driver.id ? ' active' : '');
+    card.style.borderLeft = `3px solid ${color}`;
+    if (driver.yoizumiToday) card.style.background = 'rgba(139,92,246,0.15)';
+    card.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;"><div style="display:flex;align-items:center;"><span class="driver-sb-dot" style="background:${color};"></span><span class="driver-sb-name">${driver.name}</span>${driver.yoizumiToday?'<span style="font-size:10px;margin-left:4px;">🌙</span>':''}</div><span style="font-size:10px;color:rgba(255,255,255,0.4);">${driver.code||''}</span></div><div class="driver-sb-meta">${myLocs.length}件 / ${myItems}個</div>`;
+    card.onclick = () => { filterRouteByDriver(driver.id); renderDriverSidebar(); };
+    el.appendChild(card);
+  });
+}
 function dist(a,b) { const R=111,dlat=(b.lat-a.lat)*R,dlng=(b.lng-a.lng)*R*Math.cos((a.lat+b.lat)/2*Math.PI/180); return Math.sqrt(dlat*dlat+dlng*dlng); }
 function nearestNeighbor(locs,start) {
   const n=locs.length,visited=new Array(n).fill(false),route=[];
