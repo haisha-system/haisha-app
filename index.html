@@ -848,19 +848,19 @@ function drawRoute() {
         line.setMap(map);
         routeLines.push({ line, driverId, bin });
 
-        // マーカー描画
-        ordered.forEach((loc, stopIdx) => {
+        // マーカー描画（通し番号）
+        ordered.forEach((loc) => {
+          totalStops++;
           const marker = new google.maps.Marker({
             position:{lat:loc.lat,lng:loc.lng}, map, title:loc.name,
-            label:{text:String(stopIdx+1),color:'white',fontSize:'10px',fontWeight:'bold'},
+            label:{text:String(totalStops),color:'white',fontSize:'10px',fontWeight:'bold'},
             icon:{path:google.maps.SymbolPath.CIRCLE,scale:13,fillColor:color,fillOpacity:1,strokeColor:'#fff',strokeWeight:2}
           });
           marker.addListener('click', () => new google.maps.InfoWindow({
-            content:`<b>${loc.name}</b><br><small>${loc.addr}</small><br><small>担当: ${driverName} / 第${bin}便</small>`
+            content:`<b>${totalStops}番目: ${loc.name}</b><br><small>${loc.addr}</small><br><small>担当: ${driverName} / 第${bin}便</small>`
           }).open(map, marker));
           markers.push(marker);
           driverLocs.push(loc);
-          totalStops++;
         });
       });
       orderedLocations.push(...driverLocs);
@@ -1255,18 +1255,10 @@ function renderRightSidebar() {
     const dName = driverIdx >= 0 ? drivers[driverIdx].name : '未割当';
     const bin = asgn ? `第${asgn.bin}便` : '';
 
-    const stopNumStr = orderedLocations.length > 0 && activeDriverFilter !== null
+    // ルート表示済みの場合、orderedLocationsから番号を取得
+    const stopNumStr = (orderedLocations.length > 0 && activeDriverFilter !== null && activeDriverFilter !== 'unassigned')
       ? (() => {
-          let num = 0;
-          const allBins = [1,2].flatMap(b => {
-            const bl = locations.map((l,ii)=>({l,ii}))
-              .filter(({ii})=>assignments[ii]&&assignments[ii].driverId===activeDriverFilter&&assignments[ii].bin===b);
-            if(!bl.length) return [];
-            const ls=bl.map(({l})=>l);
-            const ri=nearestNeighbor(ls,DEPOT);
-            return ri.map(idx=>locations.indexOf(ls[idx]));
-          });
-          const pos = allBins.indexOf(i);
+          const pos = orderedLocations.indexOf(loc);
           return pos >= 0 ? String(pos+1) : '';
         })()
       : '';
