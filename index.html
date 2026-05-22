@@ -39,40 +39,50 @@
     #main { display: flex; flex: 1; overflow: hidden; }
     #map { flex: 1; }
     #sidebar {
-      width: 300px; background: #f8f8f8;
-      border-left: 1px solid #ddd; overflow-y: auto; padding: 10px;
+      width: 260px; background: #161f2c;
+      border-left: 1px solid rgba(255,255,255,0.08);
+      overflow-y: auto; padding: 10px;
       flex-shrink: 0;
     }
-    .tab-bar { display: flex; gap: 4px; margin-bottom: 10px; }
-    .tab-btn {
-      flex: 1; padding: 5px 4px; font-size: 11px; border: 1px solid #ddd;
-      background: white; border-radius: 4px; cursor: pointer; color: #555;
-    }
-    .tab-btn.active { background: #2c3e50; color: white; border-color: #2c3e50; font-weight: bold; }
     #sidebar-title { font-size: 13px; color: #555; margin-bottom: 8px; font-weight: bold; }
     .stop-item {
-      background: white; border: 1px solid #ddd; border-radius: 6px;
-      padding: 8px 10px; margin-bottom: 6px; font-size: 12px; cursor: pointer;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 5px; padding: 6px 8px; margin-bottom: 4px;
+      font-size: 11px; cursor: pointer;
     }
-    .stop-item:hover { background: #e8f4fd; }
+    .stop-item:hover { background: rgba(255,255,255,0.1); }
     .stop-num {
       display: inline-flex; align-items: center; justify-content: center;
       background: #e74c3c; color: white; border-radius: 50%;
-      width: 22px; height: 22px; font-size: 11px; font-weight: bold;
-      margin-right: 6px; flex-shrink: 0;
+      width: 18px; height: 18px; font-size: 10px; font-weight: bold;
+      margin-right: 5px; flex-shrink: 0;
     }
     .stop-num.optimal { background: #1D9E75; }
-    .stop-name  { font-weight: 500; color: #222; }
-    .stop-addr  { color: #888; margin-top: 3px; font-size: 11px; padding-left: 28px; }
-    .stop-meta  { color: #aaa; margin-top: 2px; font-size: 11px; padding-left: 28px; }
+    .stop-name  { font-weight: 500; color: rgba(255,255,255,0.9); }
+    .stop-addr  { color: rgba(255,255,255,0.35); margin-top: 2px; font-size: 10px; padding-left: 23px; }
+    .stop-meta  { color: rgba(255,255,255,0.3); margin-top: 1px; font-size: 10px; padding-left: 23px; }
     .stop-header { display: flex; align-items: center; }
     .depot-card {
-      background: #f3eaff; border: 1px solid #c39bd3; border-radius: 6px;
-      padding: 8px 10px; margin-bottom: 10px; font-size: 12px;
+      background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.3);
+      border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; font-size: 12px;
     }
-    .depot-label { font-size: 11px; color: #8e44ad; font-weight: bold; margin-bottom: 2px; }
-    .depot-name  { font-weight: 500; color: #222; font-size: 13px; }
-    .depot-addr  { color: #888; font-size: 11px; margin-top: 2px; }
+    .depot-label { font-size: 11px; color: #a78bfa; font-weight: bold; margin-bottom: 2px; }
+    .depot-name  { font-weight: 500; color: rgba(255,255,255,0.9); font-size: 12px; }
+    .depot-addr  { color: rgba(255,255,255,0.4); font-size: 11px; margin-top: 2px; }
+
+    /* ドライバーカード（サイドバー） */
+    .driver-sb-card {
+      padding: 8px 10px; border-radius: 6px; margin-bottom: 5px;
+      cursor: pointer; border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04); transition: all 0.15s;
+    }
+    .driver-sb-card:hover { background: rgba(255,255,255,0.1); }
+    .driver-sb-card.active { border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); }
+    .driver-sb-name { font-size: 13px; font-weight: 700; color: white; }
+    .driver-sb-meta { font-size:11px; color: rgba(255,255,255,0.4); margin-top:2px; }
+    .driver-sb-dot  { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:6px; flex-shrink:0; }
+
+    /* 店舗リスト */
 
     /* パネル共通 */
     .panel {
@@ -192,22 +202,32 @@
 <div id="main">
   <div id="map"></div>
   <div id="sidebar">
+    <!-- デポ情報 -->
     <div class="depot-card">
       <div class="depot-label">🏭 出発地（デポ）</div>
       <div class="depot-name">メープルツリー神戸ロジスティクスセンター</div>
       <div class="depot-addr">兵庫県神戸市西区見津が丘7丁目1-3</div>
     </div>
-    <div class="tab-bar">
-      <button class="tab-btn active" id="tab-all"    onclick="switchTab('all')">全店舗</button>
-      <button class="tab-btn"        id="tab-driver" onclick="switchTab('driver')">ドライバー別</button>
+
+    <!-- 本日稼働ドライバー一覧（常時表示） -->
+    <div id="driver-panel-sidebar">
+      <div style="font-size:11px;letter-spacing:0.1em;color:#3b82f6;font-weight:700;margin-bottom:8px;text-transform:uppercase;">本日稼働ドライバー</div>
+      <div id="driver-list-sidebar"></div>
     </div>
-    <div id="tab-all-content">
-      <div id="sidebar-title">配送先リスト</div>
-      <div id="stop-list"><p style="font-size:12px;color:#aaa;">CSVまたはExcelを読み込むとここに表示されます</p></div>
-    </div>
-    <div id="tab-driver-content" style="display:none;">
-      <div class="driver-tab-bar" id="driver-tab-bar"></div>
-      <div id="driver-stop-list"></div>
+
+    <!-- 区切り -->
+    <div style="border-top:1px solid rgba(255,255,255,0.08);margin:10px 0;"></div>
+
+    <!-- 店舗リスト（折りたたみ） -->
+    <div id="stop-list-section">
+      <div onclick="toggleStopList()" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:4px 0;margin-bottom:6px;">
+        <span style="font-size:11px;letter-spacing:0.1em;color:#aaa;font-weight:700;text-transform:uppercase;">配送先リスト</span>
+        <span id="stop-list-toggle-icon" style="font-size:12px;color:#aaa;">▼</span>
+      </div>
+      <div id="stop-list-content" style="display:none;">
+        <div id="sidebar-title" style="font-size:11px;color:#888;margin-bottom:6px;"></div>
+        <div id="stop-list"><p style="font-size:12px;color:#aaa;">CSVまたはExcelを読み込むとここに表示されます</p></div>
+      </div>
     </div>
   </div>
 </div>
@@ -823,7 +843,7 @@ function drawRoute() {
   map.fitBounds(bounds);
 
   updateSidebar(orderedLocations.length > 0 ? orderedLocations : locations, true);
-  if (currentTab === 'driver') renderDriverTab();
+  renderDriverSidebar();
 }
 
 function clearRouteLines() {
@@ -975,6 +995,7 @@ function applyAssign() {
   updateSidebar(locs,orderedLocations.length>0);
   if (currentTab==='driver') renderDriverTab();
   document.getElementById('status').textContent='配車割り当てを地図に反映しました';
+  renderDriverSidebar();
   saveLocationsToSession();
 }
 
@@ -1118,6 +1139,7 @@ function nearestNeighbor(locs,start) {
 loadDrivers();
 loadDepotsFromStorage();
 checkSupabase();
+renderDriverSidebar();
 
 // メニューから渡されたファイルを自動読み込み
 function loadPendingFile() {
