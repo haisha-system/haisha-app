@@ -212,6 +212,14 @@
           <input type="text" id="new-vehicle" placeholder="例：2t車・4t車">
         </div>
         <div class="form-group">
+          <label>担当デポ</label>
+          <select id="new-depot" style="background:white;color:#1a1a1a;border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:8px 12px;font-size:13px;font-family:inherit;">
+            <option value="both">両方（神戸西・丹波）</option>
+            <option value="kobe">神戸西デポ</option>
+            <option value="tamba">丹波デポ</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label>担当エリア</label>
           <input type="text" id="new-area" placeholder="例：姫路市内">
         </div>
@@ -295,7 +303,9 @@ function renderDrivers() {
 
     const card = document.createElement('div');
     card.className = 'driver-card';
+    const depotColor = driver.depot==='kobe'?'#3b82f6':driver.depot==='tamba'?'#10b981':'#8b5cf6';
     card.style.borderLeft = `3px solid ${color}`;
+    card.style.borderTop = `2px solid ${depotColor}`;
     card.innerHTML = `
       <div class="driver-card-header">
         <div class="driver-avatar" style="background:${color};">${initials}</div>
@@ -305,6 +315,7 @@ function renderDrivers() {
         </div>
       </div>
       <div class="driver-info">
+        ${driver.depot ? `🏭 担当デポ: <span>${({'both':'両方（神戸西・丹波）','kobe':'神戸西デポ','tamba':'丹波デポ'})[driver.depot]||driver.depot}</span><br>` : ''}
         ${driver.vehicle ? `🚛 車両: <span>${driver.vehicle}</span><br>` : ''}
         ${driver.area    ? `📍 エリア: <span>${driver.area}</span><br>` : ''}
         ${driver.phone   ? `📞 <span>${driver.phone}</span><br>` : ''}
@@ -327,6 +338,7 @@ function addDriver() {
   const phone   = document.getElementById('new-phone').value.trim();
   const vehicle = document.getElementById('new-vehicle').value.trim();
   const area    = document.getElementById('new-area').value.trim();
+  const depot   = document.getElementById('new-depot').value;
   const note    = document.getElementById('new-note').value.trim();
 
   if (!name) { alert('氏名は必須です'); return; }
@@ -334,7 +346,7 @@ function addDriver() {
   if (drivers.find(d => d.code === code)) { alert('この社員コードは既に使用されています'); return; }
 
   const id = Date.now();
-  drivers.push({ id, name, code, phone, vehicle, area, note });
+  drivers.push({ id, name, code, phone, vehicle, area, depot, note });
   saveDrivers();
   renderDrivers();
   clearForm();
@@ -350,6 +362,7 @@ function editDriver(id) {
   document.getElementById('new-vehicle').value = d.vehicle || '';
   document.getElementById('new-area').value    = d.area || '';
   document.getElementById('new-note').value    = d.note || '';
+  document.getElementById('new-depot').value   = d.depot || 'both';
   drivers = drivers.filter(x => x.id !== id);
   saveDrivers();
   renderDrivers();
@@ -370,6 +383,7 @@ function deleteDriver(id) {
 function clearForm() {
   ['new-name','new-code','new-phone','new-vehicle','new-area','new-note']
     .forEach(id => document.getElementById(id).value = '');
+  document.getElementById('new-depot').value = 'both';
 }
 
 function showToast(msg) {
