@@ -356,7 +356,39 @@ function initMap() {
     label: { text: '出', color: 'white', fontSize: '10px', fontWeight: 'bold' }
   });
   depotMarker.addListener('click', () => new google.maps.InfoWindow({ content: `<b>🏭 出発地</b><br>${DEPOT.name}<br><small>${DEPOT.addr}</small>` }).open(map, depotMarker));
-  setTimeout(loadPendingFile, 500);
+  setTimeout(() => {
+    loadPendingFile();
+    // pendingFileがなければsessionStorageから復元
+    if (!sessionStorage.getItem('pendingFileName') && !sessionStorage.getItem('pendingFileData')) {
+      if (loadLocationsFromSession()) {
+        // マーカーを再描画
+        markers.forEach(m => m.setMap(null)); markers = [];
+        locations.forEach((loc, i) => {
+          const asgn = assignments[i];
+          const driverIdx = asgn ? drivers.findIndex(d => d.id === asgn.driverId) : -1;
+          const fillColor = driverIdx >= 0 ? ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22','#34495e','#e91e63','#00bcd4','#ff5722','#607d8b','#795548','#4caf50','#2196f3','#ff9800','#9c27b0','#03a9f4','#8bc34a','#f44336'][driverIdx % 20] : '#e74c3c';
+          const marker = new google.maps.Marker({
+            position: { lat: loc.lat, lng: loc.lng }, map, title: loc.name,
+            label: { text: String(i+1), color: 'white', fontSize: '11px', fontWeight: 'bold' },
+            icon: { path: google.maps.SymbolPath.CIRCLE, scale: 14, fillColor, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 }
+          });
+          marker.addListener('click', () => new google.maps.InfoWindow({
+            content: `<b>${loc.name}</b><br><small>${loc.addr}</small>`
+          }).open(map, marker));
+          markers.push(marker);
+        });
+        updateSidebar(locations, false);
+        if (locations.length > 0) {
+          const bounds = new google.maps.LatLngBounds();
+          bounds.extend({ lat: DEPOT.lat, lng: DEPOT.lng });
+          locations.forEach(l => bounds.extend({ lat: l.lat, lng: l.lng }));
+          map.fitBounds(bounds);
+          document.getElementById('status').textContent = `${locations.length}件（前回データ復元）`;
+          if (depotMarker) depotMarker.setPosition({ lat: DEPOT.lat, lng: DEPOT.lng });
+        }
+      }
+    }
+  }, 500);
 }
 
 // ===== CSV/Excel振り分け =====
@@ -586,7 +618,40 @@ function checkDone(processed, total) {
       locations.forEach(l => bounds.extend({ lat: l.lat, lng: l.lng }));
       map.fitBounds(bounds);
     }
+    // データをsessionStorageに保存（メニューに戻っても復元できる）
+    saveLocationsToSession();
   }
+}
+
+function saveLocationsToSession() {
+  try {
+    sessionStorage.setItem('haisha_locations', JSON.stringify(locations));
+    sessionStorage.setItem('haisha_currentDate', currentDate);
+    sessionStorage.setItem('haisha_assignments', JSON.stringify(assignments));
+    sessionStorage.setItem('haisha_depot', JSON.stringify(DEPOT));
+  } catch(e) { console.warn('sessionStorage保存失敗:', e); }
+}
+
+function loadLocationsFromSession() {
+  try {
+    const locs = sessionStorage.getItem('haisha_locations');
+    const date = sessionStorage.getItem('haisha_currentDate');
+    const asgn = sessionStorage.getItem('haisha_assignments');
+    const depot = sessionStorage.getItem('haisha_depot');
+    if (!locs) return false;
+    locations = JSON.parse(locs);
+    if (date) currentDate = date;
+    if (asgn) assignments = JSON.parse(asgn);
+    if (depot) {
+      const d = JSON.parse(depot);
+      DEPOT.lat = d.lat; DEPOT.lng = d.lng; DEPOT.name = d.name; DEPOT.addr = d.addr;
+      const nameEl = document.querySelector('.depot-name');
+      const addrEl = document.querySelector('.depot-addr');
+      if (nameEl) nameEl.textContent = d.name;
+      if (addrEl) addrEl.textContent = d.addr;
+    }
+    return true;
+  } catch(e) { return false; }
 }
 
 // ===== タブ =====
@@ -791,6 +856,7 @@ function applyAssign() {
   updateSidebar(locs,orderedLocations.length>0);
   if (currentTab==='driver') renderDriverTab();
   document.getElementById('status').textContent='配車割り当てを地図に反映しました';
+  saveLocationsToSession();
 }
 
 // ===== Supabase共有 =====

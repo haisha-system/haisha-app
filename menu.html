@@ -313,7 +313,7 @@
     <div class="main-card-icon" style="background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.3);">🗺</div>
     <div class="main-card-body">
       <h2>配車管理画面を開く</h2>
-      <p>地図・ルート表示・配車割り当て画面を開きます。<br>（データ読み込み済みの場合）</p>
+      <p id="map-card-status">地図・ルート表示・配車割り当て画面を開きます。</p>
     </div>
     <div class="main-card-arrow">›</div>
   </a>
@@ -440,6 +440,25 @@ function updateClock() {
 }
 updateClock();
 setInterval(updateClock, 30000);
+
+// sessionStorageのデータ状態を確認して表示
+(function() {
+  const locs = sessionStorage.getItem('haisha_locations');
+  const date = sessionStorage.getItem('haisha_currentDate');
+  const el = document.getElementById('map-card-status');
+  if (!el) return;
+  if (locs) {
+    try {
+      const arr = JSON.parse(locs);
+      const y = date ? date.slice(0,4) : '';
+      const m = date ? parseInt(date.slice(4,6)) : '';
+      const d = date ? parseInt(date.slice(6,8)) : '';
+      el.innerHTML = `<span style="color:#10b981;font-weight:700;">● データあり: ${arr.length}件</span>${date?` / ${y}年${m}月${d}日`:''}`;
+    } catch(e) {}
+  } else {
+    el.innerHTML = '地図・ルート表示・配車割り当て画面を開きます。<br><span style="color:rgba(255,255,255,0.4);font-size:12px;">（先にデータを読み込んでください）</span>';
+  }
+})();
 </script>
 </body>
 </html>
