@@ -38,12 +38,46 @@
     #file-input { display: none; }
     #main { display: flex; flex: 1; overflow: hidden; }
     #map { flex: 1; }
-    #sidebar {
+    /* 左サイドバー：ドライバー一覧 */
+    #sidebar-left {
+      width: 220px; background: #161f2c;
+      border-right: 1px solid rgba(255,255,255,0.08);
+      overflow-y: auto; padding: 10px;
+      flex-shrink: 0; display: flex; flex-direction: column;
+    }
+    /* 右サイドバー：配送先リスト */
+    #sidebar-right {
       width: 260px; background: #161f2c;
       border-left: 1px solid rgba(255,255,255,0.08);
       overflow-y: auto; padding: 10px;
       flex-shrink: 0;
     }
+    /* 旧sidebar（互換性のため残す） */
+    #sidebar { display: none; }
+
+    /* 右サイドバーのタブ */
+    .rs-tab-bar { display: flex; gap: 4px; margin-bottom: 8px; }
+    .rs-tab {
+      flex: 1; padding: 5px 4px; font-size: 11px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.04); border-radius: 4px;
+      cursor: pointer; color: rgba(255,255,255,0.5); text-align: center;
+    }
+    .rs-tab.active { background: #3b82f6; border-color: #3b82f6; color: white; font-weight: bold; }
+
+    /* ドラッグ可能な店舗カード */
+    .stop-card {
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 5px; padding: 6px 8px; margin-bottom: 4px;
+      font-size: 11px; cursor: grab; user-select: none;
+      transition: background 0.15s;
+    }
+    .stop-card:hover { background: rgba(255,255,255,0.1); }
+    .stop-card.dragging { opacity: 0.4; cursor: grabbing; }
+    .stop-card.drag-over { border-color: #3b82f6; background: rgba(59,130,246,0.15); }
+
+    /* ドライバーのドロップゾーン */
+    .driver-sb-card.drop-target { border-color: #3b82f6 !important; background: rgba(59,130,246,0.2) !important; }
     #sidebar-title { font-size: 13px; color: #555; margin-bottom: 8px; font-weight: bold; }
     .stop-item {
       background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
@@ -200,35 +234,36 @@
 </div>
 
 <div id="main">
-  <div id="map"></div>
-  <div id="sidebar">
-    <!-- デポ情報 -->
+  <!-- 左サイドバー：ドライバー一覧 -->
+  <div id="sidebar-left">
     <div class="depot-card">
-      <div class="depot-label">🏭 出発地（デポ）</div>
+      <div class="depot-label">🏭 出発地</div>
       <div class="depot-name">メープルツリー神戸ロジスティクスセンター</div>
       <div class="depot-addr">兵庫県神戸市西区見津が丘7丁目1-3</div>
     </div>
+    <div style="font-size:11px;letter-spacing:0.1em;color:#3b82f6;font-weight:700;margin-bottom:8px;text-transform:uppercase;">本日稼働ドライバー</div>
+    <div id="driver-list-sidebar" style="flex:1;"></div>
+  </div>
 
-    <!-- 本日稼働ドライバー一覧（常時表示） -->
-    <div id="driver-panel-sidebar">
-      <div style="font-size:11px;letter-spacing:0.1em;color:#3b82f6;font-weight:700;margin-bottom:8px;text-transform:uppercase;">本日稼働ドライバー</div>
-      <div id="driver-list-sidebar"></div>
+  <!-- 地図 -->
+  <div id="map" style="flex:1;"></div>
+
+  <!-- 右サイドバー：配送先リスト -->
+  <div id="sidebar-right">
+    <div style="font-size:11px;letter-spacing:0.1em;color:#10b981;font-weight:700;margin-bottom:8px;text-transform:uppercase;" id="right-sidebar-title">配送先リスト</div>
+    <div class="rs-tab-bar">
+      <div class="rs-tab active" id="rs-tab-all"    onclick="setRightTab('all')">全件</div>
+      <div class="rs-tab"        id="rs-tab-unassigned" onclick="setRightTab('unassigned')">未割当</div>
     </div>
-
-    <!-- 区切り -->
-    <div style="border-top:1px solid rgba(255,255,255,0.08);margin:10px 0;"></div>
-
-    <!-- 店舗リスト（折りたたみ） -->
-    <div id="stop-list-section">
-      <div onclick="toggleStopList()" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:4px 0;margin-bottom:6px;">
-        <span style="font-size:11px;letter-spacing:0.1em;color:#aaa;font-weight:700;text-transform:uppercase;">配送先リスト</span>
-        <span id="stop-list-toggle-icon" style="font-size:12px;color:#aaa;">▼</span>
-      </div>
-      <div id="stop-list-content" style="display:none;">
-        <div id="sidebar-title" style="font-size:11px;color:#888;margin-bottom:6px;"></div>
-        <div id="stop-list"><p style="font-size:12px;color:#aaa;">CSVまたはExcelを読み込むとここに表示されます</p></div>
-      </div>
+    <div id="right-stop-list">
+      <p style="font-size:12px;color:rgba(255,255,255,0.3);">データを読み込むとここに表示されます</p>
     </div>
+  </div>
+
+  <!-- 旧sidebar互換 -->
+  <div id="sidebar" style="display:none;">
+    <div id="sidebar-title"></div>
+    <div id="stop-list"></div>
   </div>
 </div>
 
@@ -1009,6 +1044,7 @@ function applyAssign() {
   if (currentTab==='driver') renderDriverTab();
   document.getElementById('status').textContent='配車割り当てを地図に反映しました';
   renderDriverSidebar();
+  renderRightSidebar();
   saveLocationsToSession();
 }
 
@@ -1137,6 +1173,98 @@ function exportExcel() {
 }
 
 // ===== ユーティリティ =====
+
+// ===== 右サイドバー =====
+let rightTab = 'all';
+let draggedLocIdx = null;
+
+function setRightTab(tab) {
+  rightTab = tab;
+  document.getElementById('rs-tab-all').classList.toggle('active', tab==='all');
+  document.getElementById('rs-tab-unassigned').classList.toggle('active', tab==='unassigned');
+  renderRightSidebar();
+}
+
+function renderRightSidebar() {
+  const el = document.getElementById('right-stop-list');
+  const title = document.getElementById('right-sidebar-title');
+  if (!el) return;
+
+  let locs;
+  if (activeDriverFilter !== null) {
+    // ドライバー選択中：そのドライバーの配送先のみ
+    const driver = drivers.find(d => d.id === activeDriverFilter);
+    const dName = driver ? driver.name : '不明';
+    title.textContent = `${dName} の配送先`;
+    locs = locations.map((loc, i) => ({loc, i}))
+      .filter(({i}) => assignments[i] && assignments[i].driverId === activeDriverFilter);
+  } else {
+    // 全員or未割当
+    title.textContent = rightTab === 'unassigned' ? '未割当の配送先' : '配送先リスト';
+    locs = locations.map((loc, i) => ({loc, i}));
+    if (rightTab === 'unassigned') locs = locs.filter(({i}) => !assignments[i]);
+  }
+
+  el.innerHTML = '';
+
+  if (locs.length === 0) {
+    el.innerHTML = '<p style="font-size:11px;color:rgba(255,255,255,0.3);">表示する配送先がありません</p>';
+    return;
+  }
+
+  // 合計表示
+  const totalItems = locs.reduce((s,{loc})=>s+(Number(loc.items)||0),0);
+  const totalVol   = locs.reduce((s,{loc})=>s+(Number(loc.vol)||0),0);
+  const summary = document.createElement('div');
+  summary.style.cssText = 'font-size:10px;color:rgba(255,255,255,0.3);margin-bottom:6px;padding:3px 6px;background:rgba(255,255,255,0.04);border-radius:4px;';
+  summary.textContent = `${locs.length}件 / ${totalItems}個 / ${totalVol.toFixed(1)}才`;
+  el.appendChild(summary);
+
+  locs.forEach(({loc, i}) => {
+    const asgn = assignments[i];
+    const driverIdx = asgn ? drivers.findIndex(d => d.id === asgn.driverId) : -1;
+    const color = driverIdx >= 0 ? DRIVER_COLORS[driverIdx % DRIVER_COLORS.length] : 'rgba(255,255,255,0.2)';
+
+    const card = document.createElement('div');
+    card.className = 'stop-card';
+    card.draggable = true;
+    card.dataset.locIdx = i;
+    card.style.borderLeft = `3px solid ${color}`;
+
+    const dName = driverIdx >= 0 ? drivers[driverIdx].name : '未割当';
+    const bin = asgn ? `第${asgn.bin}便` : '';
+
+    card.innerHTML = `
+      <div style="font-weight:600;color:rgba(255,255,255,0.9);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${loc.name}</div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.35);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${loc.addr}</div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px;display:flex;gap:8px;">
+        ${loc.items ? `<span>📦${loc.items}個</span>` : ''}
+        ${loc.vol   ? `<span>📐${Number(loc.vol).toFixed(1)}才</span>` : ''}
+        ${asgn ? `<span style="color:${color};">${dName} ${bin}</span>` : '<span style="color:#f59e0b;">未割当</span>'}
+      </div>
+    `;
+
+    // ドラッグイベント
+    card.addEventListener('dragstart', e => {
+      draggedLocIdx = i;
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      draggedLocIdx = null;
+    });
+
+    // クリックで地図を中央に
+    card.addEventListener('click', () => {
+      map.panTo({lat: loc.lat, lng: loc.lng});
+      map.setZoom(15);
+    });
+
+    el.appendChild(card);
+  });
+}
+
 function closeAllPanels() {
   const ap=document.getElementById('assign-panel'); if(ap) ap.style.display='none';
   document.getElementById('overlay').style.display='none';
@@ -1172,6 +1300,7 @@ function renderDriverSidebar() {
     markers.forEach(m => m.setMap(map));
     document.getElementById('status').textContent = '全ドライバーのルートを表示しました';
     renderDriverSidebar();
+    renderRightSidebar();
   };
   el.appendChild(allBtn);
   // 各ドライバー（社員コード順）
@@ -1190,7 +1319,27 @@ function renderDriverSidebar() {
     card.style.borderLeft = `3px solid ${color}`;
     if (driver.yoizumiToday) card.style.background = 'rgba(139,92,246,0.15)';
     card.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;"><div style="display:flex;align-items:center;"><span class="driver-sb-dot" style="background:${color};"></span><span class="driver-sb-name">${driver.name}</span>${driver.yoizumiToday?'<span style="font-size:10px;margin-left:4px;">🌙</span>':''}</div><span style="font-size:10px;color:rgba(255,255,255,0.4);">${driver.code||''}</span></div><div class="driver-sb-meta">${myLocs.length}件 / ${myItems}個</div>`;
-    card.onclick = () => { filterRouteByDriver(driver.id); renderDriverSidebar(); };
+    // ドロップゾーン設定
+    card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('drop-target'); });
+    card.addEventListener('dragleave', () => card.classList.remove('drop-target'));
+    card.addEventListener('drop', e => {
+      e.preventDefault();
+      card.classList.remove('drop-target');
+      if (draggedLocIdx === null) return;
+      const prevAsgn = assignments[draggedLocIdx];
+      assignments[draggedLocIdx] = { driverId: driver.id, bin: prevAsgn ? prevAsgn.bin : 1 };
+      saveLocationsToSession();
+      renderRightSidebar();
+      renderDriverSidebar();
+      // ルート表示中なら再描画
+      if (routeLines.length > 0) drawRoute();
+      document.getElementById('status').textContent = `${driver.name}に移動しました`;
+    });
+    card.onclick = () => {
+      filterRouteByDriver(driver.id);
+      renderDriverSidebar();
+      renderRightSidebar();
+    };
     el.appendChild(card);
   });
 }
@@ -1206,6 +1355,7 @@ loadDrivers();
 loadDepotsFromStorage();
 checkSupabase();
 renderDriverSidebar();
+renderRightSidebar();
 
 // メニューから渡されたファイルを自動読み込み
 function loadPendingFile() {
