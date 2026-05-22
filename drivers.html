@@ -225,7 +225,7 @@ function renderList() {
     const initial   = d.name.replace(/\s/g,'').slice(-1) || '?';
     const line2parts= [];
     if (d.carrier) line2parts.push('🏢'+getCarrierName(d.carrier));
-    if (d.yoizumi) line2parts.push('🌙宵積みあり');
+    if (d.yoizumi) line2parts.push('（宵積み対象）');
     if (d.vehicle) line2parts.push('🚛'+d.vehicle);
     if (d.area)    line2parts.push('📍'+d.area);
     if (d.phone)   line2parts.push('📞'+d.phone);
@@ -235,6 +235,7 @@ function renderList() {
     row.className = 'driver-row';
     row.style.borderLeft = `3px solid ${color}`;
     if (d.availableToday === false) row.style.opacity = '0.4';
+    if (d.yoizumiToday) row.style.background = 'rgba(139,92,246,0.12)';
     row.innerHTML = `
       <div class="driver-avatar" style="background:${color};">${initial}</div>
       <div class="driver-info">
@@ -255,7 +256,7 @@ function renderList() {
             <input type="checkbox" ${d.availableToday!==false?'checked':''} onchange="toggleAvailable(${d.id},this.checked)" style="cursor:pointer;">稼働
           </label>
           <label style="display:flex;align-items:center;gap:3px;cursor:pointer;font-size:11px;color:rgba(255,255,255,0.5);">
-            <input type="checkbox" ${d.yoizumiToday?'checked':''} onchange="toggleYoizumi(${d.id},this.checked)" style="cursor:pointer;">宵積み
+            <input type="checkbox" ${d.yoizumiToday?'checked':''} onchange="toggleYoizumi(${d.id},this.checked)" style="cursor:pointer;">🌙宵積み
           </label>
         </div>
       </div>
