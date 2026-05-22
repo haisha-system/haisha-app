@@ -1423,7 +1423,13 @@ function renderDriverSidebar() {
     });
     const bounds = new google.maps.LatLngBounds();
     unLocs.forEach(l => bounds.extend({lat:l.lat,lng:l.lng}));
-    if (unLocs.length > 0) map.fitBounds(bounds);
+    if (unLocs.length > 0) {
+      map.fitBounds(bounds);
+      // 1件だけの場合は拡大しすぎないように制限
+      google.maps.event.addListenerOnce(map, 'bounds_changed', () => {
+        if (map.getZoom() > 13) map.setZoom(13);
+      });
+    }
     document.getElementById('status').textContent = `未割当: ${unassignedCount}件`;
     renderDriverSidebar();
     renderRightSidebar();
