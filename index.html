@@ -305,6 +305,9 @@ let DEPOT = {
   name: 'メープルツリー神戸ロジスティクスセンター',
   addr: '兵庫県神戸市西区見津が丘7丁目1-3'
 };
+// デポ座標を正しい値に固定
+const DEPOT_KOBE  = { lat: 34.6664, lng: 135.0059 };
+const DEPOT_TAMBA = { lat: 35.1167, lng: 135.0167 };
 
 function loadDepotsFromStorage() {
   try {
@@ -330,9 +333,15 @@ function setDepotByCode(csvCode) {
   if (!depot) return;
 
   const useAddr = depot.departAddr || depot.loadAddr;
+  // 拠点コードから座標を決定（登録されていない場合はデフォルト）
+  const knownCoords = {
+    '2806': { lat: 34.6664, lng: 135.0059 }, // 神戸西デポ
+    '2805': { lat: 35.1167, lng: 135.0167 }, // 丹波デポ
+  };
+  const coords = knownCoords[csvCode] || { lat: depot.lat || 34.6664, lng: depot.lng || 135.0059 };
   DEPOT = {
-    lat:  depot.lat  || 34.6664,
-    lng:  depot.lng  || 135.0059,
+    lat:  coords.lat,
+    lng:  coords.lng,
     name: depot.name,
     addr: useAddr
   };
@@ -892,7 +901,6 @@ function clearRouteLines() {
 // 特定ドライバーのルートだけ表示
 function filterRouteByDriver(driverId) {
   if (activeDriverFilter === driverId && driverId !== 'unassigned') {
-    // 同じドライバーをもう一度押したら全員表示に戻す
     activeDriverFilter = null;
     routeLines.forEach(({line}) => line.setMap(map));
     markers.forEach(m => m.setMap(map));
@@ -904,7 +912,6 @@ function filterRouteByDriver(driverId) {
     });
     markers.forEach(m => m.setMap(null));
     markers = [];
-    // 該当ドライバーの店舗を便順・ルート順で番号付き表示
     const driverIdx = drivers.findIndex(d => d.id === driverId);
     const color = driverIdx >= 0 ? DRIVER_COLORS[driverIdx % DRIVER_COLORS.length] : '#aaa';
     const dName = driverIdx >= 0 ? drivers[driverIdx].name : '不明';
@@ -915,28 +922,27 @@ function filterRouteByDriver(driverId) {
       if (binLocs.length === 0) return;
       const locs = binLocs.map(({loc}) => loc);
       const routeIdx = nearestNeighbor(locs, DEPOT);
-      routeIdx.forEach(ri => {
+      for (let ri = 0; ri < routeIdx.length; ri++) {
         stopNum++;
-        const sn = stopNum;
-        const loc = locs[ri];
-        const marker = new google.maps.Marker({
-          position:{lat:loc.lat,lng:loc.lng}, map, title:loc.name,
-          label:{text:String(sn),color:'white',fontSize:'11px',fontWeight:'bold'},
-          icon:{path:google.maps.SymbolPath.CIRCLE,scale:14,fillColor:color,fillOpacity:1,strokeColor:'#fff',strokeWeight:2}
-        });
-        marker.addListener('click', () => {
-          highlightStopCard(locations.indexOf(loc));
-          new google.maps.InfoWindow({
-            content:`<b>${sn}番目: ${loc.name}</b><br><small>${loc.addr}</small><br><small>担当: ${dName} / 第${bin}便</small>`
-          }).open(map, marker);
-        });
-        markers.push(marker);
-      });
+        (function(sn, loc) {
+          const marker = new google.maps.Marker({
+            position:{lat:loc.lat,lng:loc.lng}, map, title:loc.name,
+            label:{text:String(sn),color:'white',fontSize:'11px',fontWeight:'bold'},
+            icon:{path:google.maps.SymbolPath.CIRCLE,scale:14,fillColor:color,fillOpacity:1,strokeColor:'#fff',strokeWeight:2}
+          });
+          marker.addListener('click', () => {
+            highlightStopCard(locations.indexOf(loc));
+            new google.maps.InfoWindow({
+              content:`<b>${sn}番目: ${loc.name}</b><br><small>${loc.addr}</small><br><small>担当: ${dName} / 第${bin}便</small>`
+            }).open(map, marker);
+          });
+          markers.push(marker);
+        })(stopNum, locs[routeIdx[ri]]);
+      }
     });
     document.getElementById('status').textContent = `${dName}のルートを表示中 ${stopNum}件（もう一度押すと全員表示）`;
   }
 }
-
 function clearRoute() {
   clearRouteLines();
   markers.forEach(m=>m.setMap(null)); markers=[];
