@@ -1144,7 +1144,7 @@ function renderDriverSidebar() {
   el.innerHTML = '';
   const activeDrivers = drivers.filter(d => d.availableToday !== false);
   if (activeDrivers.length === 0) {
-    el.innerHTML = '<p style="font-size:11px;color:rgba(255,255,255,0.3);padding:4px 0;">ドライバーが登録されていません<br><a href='drivers.html' style='color:#3b82f6;'>ドライバー管理へ</a></p>';
+    el.innerHTML = `<p style="font-size:11px;color:rgba(255,255,255,0.3);padding:4px 0;">ドライバーが登録されていません<br><a href="drivers.html" style="color:#3b82f6;">ドライバー管理へ</a></p>`;
     return;
   }
   // 全員ボタン
