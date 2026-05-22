@@ -866,20 +866,33 @@ function filterRouteByDriver(driverId) {
       line.setMap(rid === driverId || rid === null ? map : null);
     });
     markers.forEach(m => m.setMap(null));
-    // 該当ドライバーのマーカーだけ表示
+    markers = [];
+    // 該当ドライバーの店舗を便順・ルート順で番号付き表示
     const driverIdx = drivers.findIndex(d => d.id === driverId);
     const color = driverIdx >= 0 ? DRIVER_COLORS[driverIdx % DRIVER_COLORS.length] : '#aaa';
-    locations.forEach((loc, i) => {
-      const asgn = assignments[i];
-      if (!asgn || asgn.driverId !== driverId) return;
-      const marker = new google.maps.Marker({
-        position:{lat:loc.lat,lng:loc.lng}, map, title:loc.name,
-        icon:{path:google.maps.SymbolPath.CIRCLE,scale:13,fillColor:color,fillOpacity:1,strokeColor:'#fff',strokeWeight:2}
-      });
-      markers.push(marker);
-    });
     const dName = driverIdx >= 0 ? drivers[driverIdx].name : '不明';
-    document.getElementById('status').textContent = `${dName}のルートを表示中（もう一度押すと全員表示）`;
+    let stopNum = 0;
+    [1, 2].forEach(bin => {
+      const binLocs = locations.map((loc, i) => ({loc, i}))
+        .filter(({i}) => assignments[i] && assignments[i].driverId === driverId && assignments[i].bin === bin);
+      if (binLocs.length === 0) return;
+      const locs = binLocs.map(({loc}) => loc);
+      const routeIdx = nearestNeighbor(locs, DEPOT);
+      routeIdx.forEach(ri => {
+        stopNum++;
+        const loc = locs[ri];
+        const marker = new google.maps.Marker({
+          position:{lat:loc.lat,lng:loc.lng}, map, title:loc.name,
+          label:{text:String(stopNum),color:'white',fontSize:'11px',fontWeight:'bold'},
+          icon:{path:google.maps.SymbolPath.CIRCLE,scale:14,fillColor:color,fillOpacity:1,strokeColor:'#fff',strokeWeight:2}
+        });
+        marker.addListener('click', () => new google.maps.InfoWindow({
+          content:`<b>${stopNum}番目: ${loc.name}</b><br><small>${loc.addr}</small><br><small>担当: ${dName} / 第${bin}便</small>`
+        }).open(map, marker));
+        markers.push(marker);
+      });
+    });
+    document.getElementById('status').textContent = `${dName}のルートを表示中 ${stopNum}件（もう一度押すと全員表示）`;
   }
 }
 
@@ -1161,8 +1174,13 @@ function renderDriverSidebar() {
     renderDriverSidebar();
   };
   el.appendChild(allBtn);
-  // 各ドライバー
-  activeDrivers.forEach(driver => {
+  // 各ドライバー（社員コード順）
+  const sortedDrivers = [...activeDrivers].sort((a,b) => {
+    const ca = (a.code||'zzz').toLowerCase();
+    const cb = (b.code||'zzz').toLowerCase();
+    return ca.localeCompare(cb);
+  });
+  sortedDrivers.forEach(driver => {
     const driverIdx = drivers.indexOf(driver);
     const color = DRIVER_COLORS[driverIdx % DRIVER_COLORS.length];
     const myLocs = locations.filter((_, i) => assignments[i] && assignments[i].driverId === driver.id);
