@@ -1223,7 +1223,12 @@ function renderRightSidebar() {
     }
   } else {
     title.textContent = '配送先リスト';
-    locs = locations.map((loc, i) => ({loc, i}));
+    // ルート表示済みならorderedLocations順で表示
+    if (orderedLocations.length > 0) {
+      locs = orderedLocations.map(loc => ({loc, i: locations.indexOf(loc)})).filter(({i}) => i >= 0);
+    } else {
+      locs = locations.map((loc, i) => ({loc, i}));
+    }
   }
 
   el.innerHTML = '';
@@ -1256,7 +1261,7 @@ function renderRightSidebar() {
     const bin = asgn ? `第${asgn.bin}便` : '';
 
     // ルート表示済みの場合、orderedLocationsから番号を取得
-    const stopNumStr = (orderedLocations.length > 0 && activeDriverFilter !== null && activeDriverFilter !== 'unassigned')
+    const stopNumStr = orderedLocations.length > 0 && activeDriverFilter !== 'unassigned'
       ? (() => {
           const pos = orderedLocations.indexOf(loc);
           return pos >= 0 ? String(pos+1) : '';
@@ -1332,11 +1337,34 @@ function renderDriverSidebar() {
   allBtn.innerHTML = `<div style="display:flex;align-items:center;"><span class="driver-sb-dot" style="background:rgba(255,255,255,0.3);"></span><span class="driver-sb-name">全件表示</span></div><div class="driver-sb-meta">${activeDrivers.length}名稼働 / ${totalAssigned}件割当済</div>`;
   allBtn.onclick = () => {
     activeDriverFilter = null;
-    routeLines.forEach(({line}) => line.setMap(map));
-    markers.forEach(m => m.setMap(map));
-    document.getElementById('status').textContent = '全ドライバーのルートを表示しました';
+    if (routeLines.length > 0) {
+      // ルート表示中なら再描画
+      drawRoute();
+    } else {
+      // ルートなしなら全マーカー表示
+      markers.forEach(m => m.setMap(null)); markers = [];
+      locations.forEach((loc, i) => {
+        const asgn = assignments[i];
+        const driverIdx = asgn ? drivers.findIndex(d => d.id === asgn.driverId) : -1;
+        const fillColor = driverIdx >= 0 ? DRIVER_COLORS[driverIdx % DRIVER_COLORS.length] : '#e74c3c';
+        const marker = new google.maps.Marker({
+          position:{lat:loc.lat,lng:loc.lng}, map, title:loc.name,
+          label:{text:String(i+1),color:'white',fontSize:'11px',fontWeight:'bold'},
+          icon:{path:google.maps.SymbolPath.CIRCLE,scale:14,fillColor,fillOpacity:1,strokeColor:'#fff',strokeWeight:2}
+        });
+        markers.push(marker);
+      });
+      document.getElementById('status').textContent = `全${locations.length}件を表示しました`;
+    }
     renderDriverSidebar();
     renderRightSidebar();
+    // 地図範囲を全体に
+    if (locations.length > 0) {
+      const bounds = new google.maps.LatLngBounds();
+      bounds.extend({lat:DEPOT.lat,lng:DEPOT.lng});
+      locations.forEach(l => bounds.extend({lat:l.lat,lng:l.lng}));
+      map.fitBounds(bounds);
+    }
   };
   el.appendChild(allBtn);
 
