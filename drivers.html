@@ -143,13 +143,7 @@
               <option value="">-- 選択してください --</option>
             </select>
           </div>
-          <div class="form-group" style="justify-content:flex-end;">
-            <label>　</label>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:7px 0;">
-              <input type="checkbox" id="new-yoizumi" style="width:16px;height:16px;cursor:pointer;">
-              <span style="font-size:13px;color:white;">宵積みあり</span>
-            </label>
-          </div>
+
         </div>
         <div class="form-row">
           <div class="form-group">
@@ -225,7 +219,6 @@ function renderList() {
     const initial   = d.name.replace(/\s/g,'').slice(-1) || '?';
     const line2parts= [];
     if (d.carrier) line2parts.push('🏢'+getCarrierName(d.carrier));
-    if (d.yoizumi) line2parts.push('（宵積み対象）');
     if (d.vehicle) line2parts.push('🚛'+d.vehicle);
     if (d.area)    line2parts.push('📍'+d.area);
     if (d.phone)   line2parts.push('📞'+d.phone);
@@ -237,6 +230,9 @@ function renderList() {
     if (d.availableToday === false) row.style.opacity = '0.4';
     if (d.yoizumiToday) row.style.background = 'rgba(139,92,246,0.12)';
     row.innerHTML = `
+      <label style="display:flex;align-items:center;cursor:pointer;padding:4px;" title="本日稼働">
+        <input type="checkbox" ${d.availableToday!==false?'checked':''} onchange="toggleAvailable(${d.id},this.checked)" style="width:20px;height:20px;cursor:pointer;">
+      </label>
       <div class="driver-avatar" style="background:${color};">${initial}</div>
       <div class="driver-info">
         <div class="driver-line1">
@@ -246,19 +242,14 @@ function renderList() {
         </div>
         <div class="driver-line2">${line2parts.join('　') || '（情報なし）'}</div>
       </div>
-      <div class="driver-actions" style="flex-direction:column;align-items:flex-end;gap:4px;">
+      <div class="driver-actions" style="flex-direction:column;align-items:flex-end;gap:6px;">
         <div style="display:flex;gap:5px;">
           <button class="btn-xs btn-edit" onclick="editDriver(${d.id})">編集</button>
           <button class="btn-xs btn-del"  onclick="deleteDriver(${d.id})">削除</button>
         </div>
-        <div style="display:flex;gap:6px;align-items:center;">
-          <label style="display:flex;align-items:center;gap:3px;cursor:pointer;font-size:11px;color:rgba(255,255,255,0.5);">
-            <input type="checkbox" ${d.availableToday!==false?'checked':''} onchange="toggleAvailable(${d.id},this.checked)" style="cursor:pointer;">稼働
-          </label>
-          <label style="display:flex;align-items:center;gap:3px;cursor:pointer;font-size:11px;color:rgba(255,255,255,0.5);">
-            <input type="checkbox" ${d.yoizumiToday?'checked':''} onchange="toggleYoizumi(${d.id},this.checked)" style="cursor:pointer;">🌙宵積み
-          </label>
-        </div>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:rgba(255,255,255,0.5);">
+          <input type="checkbox" ${d.yoizumiToday?'checked':''} onchange="toggleYoizumi(${d.id},this.checked)" style="cursor:pointer;">🌙宵積み
+        </label>
       </div>
     `;
     el.appendChild(row);
@@ -274,7 +265,7 @@ function addDriver() {
   const phone   = document.getElementById('new-phone').value.trim();
   const area    = document.getElementById('new-area').value.trim();
   const carrier  = document.getElementById('new-carrier').value;
-  const yoizumi  = document.getElementById('new-yoizumi').checked;
+  const yoizumi  = false;
   const note    = document.getElementById('new-note').value.trim();
   if (!name) { alert('氏名は必須です'); return; }
   if (!code) { alert('社員コードは必須です'); return; }
@@ -304,7 +295,6 @@ function editDriver(id) {
   document.getElementById('new-phone').value   = d.phone || '';
   document.getElementById('new-area').value    = d.area || '';
   document.getElementById('new-carrier').value  = d.carrier || '';
-  document.getElementById('new-yoizumi').checked = !!d.yoizumi;
   document.getElementById('new-note').value    = d.note || '';
   document.getElementById('form-title').textContent = `編集: ${d.name}`;
   document.getElementById('form-title').dataset.editId = d.id;
@@ -322,7 +312,6 @@ function clearForm() {
   ['new-name','new-code','new-vehicle','new-phone','new-area','new-note'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('new-depot').value   = 'both';
   document.getElementById('new-carrier').value  = '';
-  document.getElementById('new-yoizumi').checked = false;
   document.getElementById('form-title').textContent = '新規登録';
   document.getElementById('form-title').dataset.editId = '';
 }
