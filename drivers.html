@@ -7,250 +7,163 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Noto Sans JP', sans-serif;
-      background: #0f1923; color: white; min-height: 100vh;
-    }
+    body { font-family: 'Noto Sans JP', sans-serif; background: #0f1923; color: white; min-height: 100vh; }
     body::before {
       content: ''; position: fixed; inset: 0;
-      background-image:
-        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
       background-size: 40px 40px; pointer-events: none;
     }
-    header {
-      padding: 24px 40px; border-bottom: 1px solid rgba(255,255,255,0.08);
-      display: flex; align-items: center; gap: 16px;
-    }
-    .back-btn {
-      background: rgba(255,255,255,0.08); border: none; color: white;
-      padding: 7px 14px; border-radius: 6px; cursor: pointer;
-      font-size: 13px; font-family: inherit;
-    }
+    header { padding: 20px 32px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 16px; }
+    .back-btn { background: rgba(255,255,255,0.08); border: none; color: white; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; }
     .back-btn:hover { background: rgba(255,255,255,0.15); }
     header h1 { font-size: 18px; font-weight: 700; }
     header p  { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 2px; }
 
-    main { max-width: 900px; margin: 0 auto; padding: 32px 40px 100px; }
+    main { max-width: 1200px; margin: 0 auto; padding: 24px 32px 100px; }
+    .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .section-title { font-size: 11px; letter-spacing: 0.15em; color: #10b981; font-weight: 500; margin-bottom: 12px; text-transform: uppercase; }
 
-    .section { margin-bottom: 36px; }
-    .section-title {
-      font-size: 11px; letter-spacing: 0.15em; color: #10b981;
-      font-weight: 500; margin-bottom: 16px; text-transform: uppercase;
-    }
-
-    /* 統計バー */
-    .stats-row {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
-      margin-bottom: 28px;
-    }
-    .stat-card {
-      background: #161f2c; border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 10px; padding: 16px 20px;
-    }
-    .stat-label { font-size: 11px; color: rgba(255,255,255,0.4); margin-bottom: 6px; }
-    .stat-value { font-size: 26px; font-weight: 700; }
-    .stat-value span { font-size: 13px; font-weight: 400; color: rgba(255,255,255,0.4); margin-left: 4px; }
-
-    /* 追加フォーム */
-    .add-form {
-      background: #161f2c; border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 12px; padding: 24px; margin-bottom: 24px;
-    }
-    .add-form h3 { font-size: 14px; font-weight: 700; margin-bottom: 16px; color: rgba(255,255,255,0.8); }
-    .form-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 14px; }
-    .form-group { display: flex; flex-direction: column; gap: 5px; }
-    .form-group label { font-size: 11px; color: rgba(255,255,255,0.4); letter-spacing: 0.05em; }
-    .form-group input {
-      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
-      color: white; border-radius: 6px; padding: 8px 12px;
-      font-size: 13px; font-family: inherit;
-    }
-    .form-group input:focus { outline: none; border-color: #10b981; }
-    .form-group input::placeholder { color: rgba(255,255,255,0.25); }
-    .form-group.full { grid-column: 1 / -1; }
-    .form-actions { display: flex; gap: 10px; }
-    .btn-primary {
-      padding: 9px 20px; background: #10b981; color: white;
-      border: none; border-radius: 6px; cursor: pointer;
-      font-size: 13px; font-family: inherit; font-weight: 500;
-    }
-    .btn-primary:hover { background: #059669; }
-    .btn-secondary {
-      padding: 9px 16px; background: rgba(255,255,255,0.08);
-      color: rgba(255,255,255,0.6); border: none; border-radius: 6px;
-      cursor: pointer; font-size: 13px; font-family: inherit;
-    }
-
-    /* ドライバーリスト */
-    .driver-grid {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 12px;
-    }
-    .driver-card {
-      background: #161f2c; border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 12px; padding: 18px 20px;
-      transition: border-color 0.2s;
-    }
-    .driver-card:hover { border-color: rgba(255,255,255,0.2); }
-    .driver-card-header {
-      display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
-    }
-    .driver-avatar {
-      width: 40px; height: 40px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 16px; font-weight: 700; color: white; flex-shrink: 0;
-    }
-    .driver-name { font-size: 15px; font-weight: 700; }
-    .driver-code { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 2px; font-family: monospace; }
-    .driver-info {
-      font-size: 12px; color: rgba(255,255,255,0.4);
-      line-height: 1.8; margin-bottom: 12px;
-    }
-    .driver-info span { color: rgba(255,255,255,0.7); }
-    .driver-actions { display: flex; gap: 8px; }
-    .btn-sm {
-      padding: 5px 12px; border-radius: 5px; border: none;
-      font-size: 12px; cursor: pointer; font-family: inherit;
-    }
-    .btn-edit   { background: rgba(255,255,255,0.1); color: white; }
-    .btn-edit:hover { background: rgba(255,255,255,0.18); }
-    .btn-delete { background: rgba(239,68,68,0.15); color: #f87171; }
-    .btn-delete:hover { background: rgba(239,68,68,0.25); }
+    /* 統計 */
+    .stats-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 16px; }
+    .stat-card { background: #161f2c; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px 16px; }
+    .stat-label { font-size: 11px; color: rgba(255,255,255,0.4); margin-bottom: 4px; }
+    .stat-value { font-size: 22px; font-weight: 700; }
+    .stat-value span { font-size: 12px; font-weight: 400; color: rgba(255,255,255,0.4); }
 
     /* 検索 */
-    .search-bar {
-      display: flex; gap: 10px; margin-bottom: 16px;
+    .search-box { margin-bottom: 10px; }
+    .search-box input {
+      width: 100%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+      color: white; border-radius: 6px; padding: 8px 12px; font-size: 13px; font-family: inherit;
     }
-    .search-bar input {
-      flex: 1; background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.12); color: white;
-      border-radius: 6px; padding: 8px 14px; font-size: 13px; font-family: inherit;
-    }
-    .search-bar input:focus { outline: none; border-color: #10b981; }
-    .search-bar input::placeholder { color: rgba(255,255,255,0.25); }
+    .search-box input:focus { outline: none; border-color: #10b981; }
+    .search-box input::placeholder { color: rgba(255,255,255,0.25); }
 
-    /* 保存バー */
-    .save-bar {
-      position: fixed; bottom: 0; left: 0; right: 0;
-      background: #0f1923; border-top: 1px solid rgba(255,255,255,0.08);
-      padding: 16px 40px; display: flex; align-items: center; justify-content: space-between;
+    /* ドライバーリスト */
+    .driver-list { display: flex; flex-direction: column; gap: 5px; }
+    .driver-row {
+      background: #161f2c; border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px; padding: 9px 12px;
+      display: grid; grid-template-columns: 32px 1fr auto;
+      gap: 8px; align-items: center;
     }
+    .driver-row:hover { border-color: rgba(255,255,255,0.18); }
+    .driver-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white; flex-shrink: 0; }
+    .driver-info { min-width: 0; }
+    .driver-line1 { display: flex; align-items: center; gap: 6px; }
+    .driver-name  { font-size: 13px; font-weight: 700; }
+    .driver-code-badge { font-size: 10px; background: rgba(255,255,255,0.1); padding: 1px 6px; border-radius: 4px; color: rgba(255,255,255,0.6); font-family: monospace; }
+    .depot-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .driver-line2 { font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .driver-actions { display: flex; gap: 5px; flex-shrink: 0; }
+    .btn-xs { padding: 3px 9px; border-radius: 4px; border: none; font-size: 11px; cursor: pointer; font-family: inherit; }
+    .btn-edit { background: rgba(255,255,255,0.1); color: white; }
+    .btn-edit:hover { background: rgba(255,255,255,0.2); }
+    .btn-del  { background: rgba(239,68,68,0.15); color: #f87171; }
+    .btn-del:hover { background: rgba(239,68,68,0.28); }
+
+    /* 追加フォーム */
+    .add-form { background: #161f2c; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; }
+    .add-form h3 { font-size: 13px; font-weight: 700; margin-bottom: 14px; color: rgba(255,255,255,0.8); }
+    .form-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+    .form-group label { font-size: 11px; color: rgba(255,255,255,0.4); }
+    .form-group input { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: white; border-radius: 5px; padding: 7px 10px; font-size: 13px; font-family: inherit; }
+    .form-group input:focus { outline: none; border-color: #10b981; }
+    .form-group input::placeholder { color: rgba(255,255,255,0.2); }
+    .form-group select { background: white; color: #1a1a1a; border: 1px solid rgba(255,255,255,0.12); border-radius: 5px; padding: 7px 10px; font-size: 13px; font-family: inherit; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .form-actions { display: flex; gap: 8px; margin-top: 4px; }
+    .btn-add { padding: 8px 18px; background: #10b981; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 13px; font-family: inherit; font-weight: 700; }
+    .btn-add:hover { background: #059669; }
+    .btn-clr { padding: 8px 14px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.5); border: none; border-radius: 5px; cursor: pointer; font-size: 13px; font-family: inherit; }
+
+    .save-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #0f1923; border-top: 1px solid rgba(255,255,255,0.08); padding: 14px 32px; display: flex; align-items: center; justify-content: space-between; }
     .save-bar span { font-size: 12px; color: rgba(255,255,255,0.4); }
-    .btn-save {
-      padding: 10px 28px; background: #10b981; color: white;
-      border: none; border-radius: 7px; cursor: pointer;
-      font-size: 14px; font-family: inherit; font-weight: 700;
-    }
-    .btn-save:hover { background: #059669; }
-
-    .toast {
-      display: none; position: fixed; top: 20px; left: 50%;
-      transform: translateX(-50%); background: #10b981; color: white;
-      padding: 10px 24px; border-radius: 20px; font-size: 13px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.3); z-index: 999;
-    }
-    .empty-msg { font-size: 13px; color: rgba(255,255,255,0.3); padding: 20px 0; }
-
-    @media (max-width: 640px) {
-      header { padding: 16px 20px; }
-      main { padding: 20px 20px 100px; }
-      .form-grid { grid-template-columns: 1fr; }
-      .stats-row { grid-template-columns: repeat(3,1fr); }
-      .save-bar { padding: 12px 20px; }
-    }
+    .btn-save { padding: 9px 24px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-family: inherit; font-weight: 700; }
+    .toast { display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 10px 24px; border-radius: 20px; font-size: 13px; box-shadow: 0 2px 12px rgba(0,0,0,0.3); z-index: 999; }
+    .empty-msg { font-size: 12px; color: rgba(255,255,255,0.3); padding: 12px 0; }
+    @media(max-width:700px){ .layout{grid-template-columns:1fr;} .form-row{grid-template-columns:1fr;} .stats-row{grid-template-columns:repeat(3,1fr);} header{padding:16px 20px;} main{padding:16px 20px 100px;} }
   </style>
 </head>
 <body>
-
 <header>
   <button class="back-btn" onclick="location.href='menu.html'">← メニュー</button>
-  <div>
-    <h1>👤 ドライバー管理</h1>
-    <p>ドライバーの登録・社員コード・車両情報の管理（部署1）</p>
-  </div>
+  <div><h1>👤 ドライバー管理</h1><p>ドライバーの登録・社員コード・担当デポの管理（部署1）</p></div>
 </header>
-
 <main>
-
   <!-- 統計 -->
   <div class="stats-row">
-    <div class="stat-card">
-      <div class="stat-label">登録ドライバー数</div>
-      <div class="stat-value" id="stat-total">0<span>名</span></div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">車両登録済み</div>
-      <div class="stat-value" id="stat-vehicle">0<span>台</span></div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">社員コード登録済み</div>
-      <div class="stat-value" id="stat-code">0<span>名</span></div>
-    </div>
+    <div class="stat-card"><div class="stat-label">登録人数</div><div class="stat-value" id="stat-total">0<span>名</span></div></div>
+    <div class="stat-card"><div class="stat-label">神戸西担当</div><div class="stat-value" id="stat-kobe">0<span>名</span></div></div>
+    <div class="stat-card"><div class="stat-label">丹波担当</div><div class="stat-value" id="stat-tamba">0<span>名</span></div></div>
   </div>
 
-  <!-- 追加フォーム -->
-  <div class="section">
-    <div class="section-title">ドライバーを追加</div>
-    <div class="add-form">
-      <h3>新しいドライバーを登録</h3>
-      <div class="form-grid">
-        <div class="form-group">
-          <label>氏名 *</label>
-          <input type="text" id="new-name" placeholder="例：田中 太郎">
+  <div class="layout">
+    <!-- 左：リスト -->
+    <div>
+      <div class="section-title">登録済みドライバー</div>
+      <div class="search-box">
+        <input type="text" id="search" placeholder="名前・社員コード・エリアで検索..." oninput="renderList()">
+      </div>
+      <div class="driver-list" id="driver-list"></div>
+    </div>
+
+    <!-- 右：フォーム -->
+    <div>
+      <div class="section-title">ドライバーを追加・編集</div>
+      <div class="add-form">
+        <h3 id="form-title" data-edit-id="">新規登録</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>氏名 *</label>
+            <input type="text" id="new-name" placeholder="例：田中 太郎">
+          </div>
+          <div class="form-group">
+            <label>社員コード *</label>
+            <input type="text" id="new-code" placeholder="例：D001">
+          </div>
         </div>
-        <div class="form-group">
-          <label>社員コード *</label>
-          <input type="text" id="new-code" placeholder="例：D001">
+        <div class="form-row">
+          <div class="form-group">
+            <label>担当デポ</label>
+            <select id="new-depot">
+              <option value="both">両方（神戸西・丹波）</option>
+              <option value="kobe">神戸西デポ</option>
+              <option value="tamba">丹波デポ</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>担当車両</label>
+            <input type="text" id="new-vehicle" placeholder="例：2t車">
+          </div>
         </div>
-        <div class="form-group">
-          <label>電話番号</label>
-          <input type="tel" id="new-phone" placeholder="例：090-1234-5678">
-        </div>
-        <div class="form-group">
-          <label>担当車両</label>
-          <input type="text" id="new-vehicle" placeholder="例：2t車・4t車">
-        </div>
-        <div class="form-group">
-          <label>担当デポ</label>
-          <select id="new-depot" style="background:white;color:#1a1a1a;border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:8px 12px;font-size:13px;font-family:inherit;">
-            <option value="both">両方（神戸西・丹波）</option>
-            <option value="kobe">神戸西デポ</option>
-            <option value="tamba">丹波デポ</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>担当エリア</label>
-          <input type="text" id="new-area" placeholder="例：姫路市内">
+        <div class="form-row">
+          <div class="form-group">
+            <label>電話番号</label>
+            <input type="tel" id="new-phone" placeholder="090-0000-0000">
+          </div>
+          <div class="form-group">
+            <label>担当エリア</label>
+            <input type="text" id="new-area" placeholder="例：姫路市内">
+          </div>
         </div>
         <div class="form-group">
           <label>備考</label>
-          <input type="text" id="new-note" placeholder="例：午前のみ">
+          <input type="text" id="new-note" placeholder="メモ">
+        </div>
+        <div class="form-actions">
+          <button class="btn-add" onclick="addDriver()">＋ 登録</button>
+          <button class="btn-clr" onclick="clearForm()">クリア</button>
         </div>
       </div>
-      <div class="form-actions">
-        <button class="btn-primary" onclick="addDriver()">＋ 追加</button>
-        <button class="btn-secondary" onclick="clearForm()">クリア</button>
-      </div>
     </div>
   </div>
-
-  <!-- ドライバーリスト -->
-  <div class="section">
-    <div class="section-title">登録済みドライバー</div>
-    <div class="search-bar">
-      <input type="text" id="search-input" placeholder="名前・社員コード・エリアで検索..." oninput="renderDrivers()">
-    </div>
-    <div class="driver-grid" id="driver-grid"></div>
-  </div>
-
 </main>
 
 <div class="save-bar">
-  <span id="save-info">変更は自動保存されます</span>
+  <span>変更は自動保存されます</span>
   <button class="btn-save" onclick="location.href='menu.html'">← メニューに戻る</button>
 </div>
-
 <div class="toast" id="toast"></div>
 
 <script>
@@ -260,97 +173,95 @@ const DRIVER_COLORS = [
   '#ff5722','#607d8b','#795548','#4caf50','#2196f3',
   '#ff9800','#9c27b0','#03a9f4','#8bc34a','#f44336'
 ];
+const DEPOT_COLOR = { kobe:'#3b82f6', tamba:'#10b981', both:'#8b5cf6' };
+const DEPOT_LABEL = { kobe:'神戸西', tamba:'丹波', both:'両方' };
 
 let drivers = [];
 
 function loadDrivers() {
-  try {
-    const d = localStorage.getItem('haisha_drivers');
-    if (d) drivers = JSON.parse(d);
-  } catch(e) { drivers = []; }
+  try { const d = localStorage.getItem('haisha_drivers'); if (d) drivers = JSON.parse(d); } catch(e) { drivers = []; }
 }
+function saveDrivers() { localStorage.setItem('haisha_drivers', JSON.stringify(drivers)); }
 
-function saveDrivers() {
-  localStorage.setItem('haisha_drivers', JSON.stringify(drivers));
+function getSortKey(d) {
+  const code = (d.code || 'zzz').toLowerCase();
+  return code.padStart(20, '0');
 }
 
 function updateStats() {
-  document.getElementById('stat-total').innerHTML   = `${drivers.length}<span>名</span>`;
-  document.getElementById('stat-vehicle').innerHTML = `${drivers.filter(d=>d.vehicle).length}<span>台</span>`;
-  document.getElementById('stat-code').innerHTML    = `${drivers.filter(d=>d.code).length}<span>名</span>`;
+  document.getElementById('stat-total').innerHTML  = `${drivers.length}<span>名</span>`;
+  document.getElementById('stat-kobe').innerHTML   = `${drivers.filter(d=>d.depot==='kobe'||d.depot==='both'||!d.depot).length}<span>名</span>`;
+  document.getElementById('stat-tamba').innerHTML  = `${drivers.filter(d=>d.depot==='tamba'||d.depot==='both'||!d.depot).length}<span>名</span>`;
 }
 
-function renderDrivers() {
-  const grid = document.getElementById('driver-grid');
-  const query = document.getElementById('search-input').value.toLowerCase();
+function renderList() {
+  const el = document.getElementById('driver-list');
+  const q  = document.getElementById('search').value.toLowerCase();
+  const filtered = [...drivers]
+    .filter(d => d.name.toLowerCase().includes(q) || (d.code||'').toLowerCase().includes(q) || (d.area||'').toLowerCase().includes(q))
+    .sort((a,b) => getSortKey(a).localeCompare(getSortKey(b)));
 
-  const filtered = drivers.filter(d =>
-    d.name.toLowerCase().includes(query) ||
-    (d.code||'').toLowerCase().includes(query) ||
-    (d.area||'').toLowerCase().includes(query)
-  );
+  el.innerHTML = '';
+  if (filtered.length === 0) { el.innerHTML = '<p class="empty-msg">ドライバーが登録されていません</p>'; return; }
 
-  grid.innerHTML = '';
+  filtered.forEach((d, idx) => {
+    const color     = DRIVER_COLORS[drivers.indexOf(d) % DRIVER_COLORS.length];
+    const depotColor= DEPOT_COLOR[d.depot||'both'];
+    const depotLabel= DEPOT_LABEL[d.depot||'both'];
+    const initial   = d.name.replace(/\s/g,'').slice(-1) || '?';
+    const line2parts= [];
+    if (d.vehicle) line2parts.push('🚛'+d.vehicle);
+    if (d.area)    line2parts.push('📍'+d.area);
+    if (d.phone)   line2parts.push('📞'+d.phone);
+    if (d.note)    line2parts.push(d.note);
 
-  if (filtered.length === 0) {
-    grid.innerHTML = '<p class="empty-msg">登録されているドライバーがありません</p>';
-    return;
-  }
-
-  filtered.forEach((driver, idx) => {
-    const color = DRIVER_COLORS[drivers.indexOf(driver) % DRIVER_COLORS.length];
-    const initials = driver.name.replace(/\s/g,'').slice(-1) || '?';
-
-    const card = document.createElement('div');
-    card.className = 'driver-card';
-    const depotColor = driver.depot==='kobe'?'#3b82f6':driver.depot==='tamba'?'#10b981':'#8b5cf6';
-    card.style.borderLeft = `3px solid ${color}`;
-    card.style.borderTop = `2px solid ${depotColor}`;
-    card.innerHTML = `
-      <div class="driver-card-header">
-        <div class="driver-avatar" style="background:${color};">${initials}</div>
-        <div>
-          <div class="driver-name">${driver.name}</div>
-          <div class="driver-code">${driver.code ? '社員コード: '+driver.code : '社員コード未設定'}</div>
-        </div>
-      </div>
+    const row = document.createElement('div');
+    row.className = 'driver-row';
+    row.style.borderLeft = `3px solid ${color}`;
+    row.innerHTML = `
+      <div class="driver-avatar" style="background:${color};">${initial}</div>
       <div class="driver-info">
-        ${driver.depot ? `🏭 担当デポ: <span>${({'both':'両方（神戸西・丹波）','kobe':'神戸西デポ','tamba':'丹波デポ'})[driver.depot]||driver.depot}</span><br>` : ''}
-        ${driver.vehicle ? `🚛 車両: <span>${driver.vehicle}</span><br>` : ''}
-        ${driver.area    ? `📍 エリア: <span>${driver.area}</span><br>` : ''}
-        ${driver.phone   ? `📞 <span>${driver.phone}</span><br>` : ''}
-        ${driver.note    ? `📝 <span>${driver.note}</span>` : ''}
+        <div class="driver-line1">
+          <span class="driver-name">${d.name}</span>
+          ${d.code ? `<span class="driver-code-badge">${d.code}</span>` : ''}
+          <span class="depot-dot" style="background:${depotColor};" title="${depotLabel}"></span>
+        </div>
+        <div class="driver-line2">${line2parts.join('　') || '（情報なし）'}</div>
       </div>
       <div class="driver-actions">
-        <button class="btn-sm btn-edit" onclick="editDriver(${driver.id})">✏️ 編集</button>
-        <button class="btn-sm btn-delete" onclick="deleteDriver(${driver.id})">削除</button>
+        <button class="btn-xs btn-edit" onclick="editDriver(${d.id})">編集</button>
+        <button class="btn-xs btn-del"  onclick="deleteDriver(${d.id})">削除</button>
       </div>
     `;
-    grid.appendChild(card);
+    el.appendChild(row);
   });
-
   updateStats();
 }
 
 function addDriver() {
   const name    = document.getElementById('new-name').value.trim();
   const code    = document.getElementById('new-code').value.trim();
-  const phone   = document.getElementById('new-phone').value.trim();
-  const vehicle = document.getElementById('new-vehicle').value.trim();
-  const area    = document.getElementById('new-area').value.trim();
   const depot   = document.getElementById('new-depot').value;
+  const vehicle = document.getElementById('new-vehicle').value.trim();
+  const phone   = document.getElementById('new-phone').value.trim();
+  const area    = document.getElementById('new-area').value.trim();
   const note    = document.getElementById('new-note').value.trim();
-
   if (!name) { alert('氏名は必須です'); return; }
   if (!code) { alert('社員コードは必須です'); return; }
-  if (drivers.find(d => d.code === code)) { alert('この社員コードは既に使用されています'); return; }
 
-  const id = Date.now();
-  drivers.push({ id, name, code, phone, vehicle, area, depot, note });
-  saveDrivers();
-  renderDrivers();
-  clearForm();
-  showToast(`${name} を追加しました`);
+  const editId = parseInt(document.getElementById('form-title').dataset.editId || '0');
+  if (editId) {
+    const idx = drivers.findIndex(d => d.id === editId);
+    if (idx >= 0) drivers[idx] = { ...drivers[idx], name, code, depot, vehicle, phone, area, note };
+    document.getElementById('form-title').textContent = '新規登録';
+    document.getElementById('form-title').dataset.editId = '';
+    showToast('更新しました');
+  } else {
+    if (drivers.find(d => d.code === code && d.id !== editId)) { alert('この社員コードは既に使用されています'); return; }
+    drivers.push({ id: Date.now(), name, code, depot, vehicle, phone, area, note });
+    showToast(`${name} を登録しました`);
+  }
+  saveDrivers(); renderList(); clearForm();
 }
 
 function editDriver(id) {
@@ -358,32 +269,28 @@ function editDriver(id) {
   if (!d) return;
   document.getElementById('new-name').value    = d.name;
   document.getElementById('new-code').value    = d.code || '';
-  document.getElementById('new-phone').value   = d.phone || '';
+  document.getElementById('new-depot').value   = d.depot || 'both';
   document.getElementById('new-vehicle').value = d.vehicle || '';
+  document.getElementById('new-phone').value   = d.phone || '';
   document.getElementById('new-area').value    = d.area || '';
   document.getElementById('new-note').value    = d.note || '';
-  document.getElementById('new-depot').value   = d.depot || 'both';
-  drivers = drivers.filter(x => x.id !== id);
-  saveDrivers();
-  renderDrivers();
-  showToast('編集内容を入力して「追加」を押してください');
+  document.getElementById('form-title').textContent = `編集: ${d.name}`;
+  document.getElementById('form-title').dataset.editId = d.id;
   window.scrollTo(0, 0);
 }
 
 function deleteDriver(id) {
   const d = drivers.find(x => x.id === id);
-  if (!d) return;
-  if (!confirm(`「${d.name}」を削除しますか？`)) return;
+  if (!d || !confirm(`「${d.name}」を削除しますか？`)) return;
   drivers = drivers.filter(x => x.id !== id);
-  saveDrivers();
-  renderDrivers();
-  showToast('削除しました');
+  saveDrivers(); renderList(); showToast('削除しました');
 }
 
 function clearForm() {
-  ['new-name','new-code','new-phone','new-vehicle','new-area','new-note']
-    .forEach(id => document.getElementById(id).value = '');
+  ['new-name','new-code','new-vehicle','new-phone','new-area','new-note'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('new-depot').value = 'both';
+  document.getElementById('form-title').textContent = '新規登録';
+  document.getElementById('form-title').dataset.editId = '';
 }
 
 function showToast(msg) {
@@ -392,8 +299,7 @@ function showToast(msg) {
   setTimeout(() => t.style.display = 'none', 2500);
 }
 
-loadDrivers();
-renderDrivers();
+loadDrivers(); renderList();
 </script>
 </body>
 </html>

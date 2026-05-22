@@ -7,296 +7,163 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Noto Sans JP', sans-serif;
-      background: #0f1923;
-      color: white;
-      min-height: 100vh;
-    }
+    body { font-family: 'Noto Sans JP', sans-serif; background: #0f1923; color: white; min-height: 100vh; }
     body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-      background-size: 40px 40px;
-      pointer-events: none;
+      content: ''; position: fixed; inset: 0;
+      background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px; pointer-events: none;
     }
-    header {
-      padding: 24px 40px;
-      border-bottom: 1px solid rgba(255,255,255,0.08);
-      display: flex; align-items: center; gap: 16px;
-    }
-    .back-btn {
-      background: rgba(255,255,255,0.08); border: none; color: white;
-      padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px;
-      font-family: inherit;
-    }
+    header { padding: 20px 32px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 16px; }
+    .back-btn { background: rgba(255,255,255,0.08); border: none; color: white; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; }
     .back-btn:hover { background: rgba(255,255,255,0.15); }
     header h1 { font-size: 18px; font-weight: 700; }
     header p  { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 2px; }
 
-    main { max-width: 900px; margin: 0 auto; padding: 32px 40px; }
+    main { max-width: 1200px; margin: 0 auto; padding: 24px 32px 100px; }
+    .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .section-title { font-size: 11px; letter-spacing: 0.15em; color: #f59e0b; font-weight: 500; margin-bottom: 12px; text-transform: uppercase; }
 
-    .section { margin-bottom: 40px; }
-    .section-title {
-      font-size: 11px; letter-spacing: 0.15em; color: #f59e0b;
-      font-weight: 500; margin-bottom: 16px; text-transform: uppercase;
+    /* 左：登録済みリスト */
+    .depot-grid { display: flex; flex-direction: column; gap: 6px; }
+    .depot-row {
+      background: #161f2c; border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px; padding: 10px 14px;
+      display: grid; grid-template-columns: 1fr auto;
+      gap: 4px; align-items: center;
     }
+    .depot-row:hover { border-color: rgba(255,255,255,0.18); }
+    .depot-row.type-main   { border-left: 3px solid #3b82f6; }
+    .depot-row.type-sub    { border-left: 3px solid #10b981; }
+    .depot-row.type-own    { border-left: 3px solid #8b5cf6; }
+    .depot-row.type-carrier{ border-left: 3px solid #f59e0b; }
 
-    /* 拠点カード */
-    .depot-card {
-      background: #161f2c;
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 12px;
-      padding: 20px 24px;
-      margin-bottom: 12px;
-      position: relative;
-    }
-    .depot-card.own-depot {
-      border-color: rgba(139,92,246,0.3);
-      background: linear-gradient(135deg, #2d1f4e, #161f2c);
-    }
-    .depot-card.main-depot {
-      border-color: rgba(59,130,246,0.3);
-      background: linear-gradient(135deg, #1a2f4e, #161f2c);
-    }
-    .depot-card-header {
-      display: flex; align-items: flex-start; justify-content: space-between;
-      margin-bottom: 12px;
-    }
-    .depot-badge {
-      font-size: 10px; padding: 2px 8px; border-radius: 10px;
-      font-weight: 700; letter-spacing: 0.05em;
-    }
-    .badge-main   { background: #3b82f6; color: white; }
-    .badge-sub    { background: #10b981; color: white; }
-    .badge-own    { background: #8b5cf6; color: white; }
-    .badge-partner{ background: #f59e0b; color: #000; }
+    .depot-row-info { min-width: 0; }
+    .depot-row-line1 { display: flex; align-items: center; gap: 8px; }
+    .depot-row-name  { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .depot-row-line2 { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .depot-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
 
-    .depot-code {
-      font-size: 12px; color: rgba(255,255,255,0.4);
-      font-family: monospace; margin-bottom: 4px;
-    }
-    .depot-name { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
-    .depot-addr { font-size: 12px; color: rgba(255,255,255,0.5); }
+    .badge { font-size: 10px; padding: 1px 7px; border-radius: 8px; font-weight: 700; flex-shrink: 0; }
+    .badge-main    { background: #3b82f6; color: white; }
+    .badge-sub     { background: #10b981; color: white; }
+    .badge-own     { background: #8b5cf6; color: white; }
+    .badge-carrier { background: #f59e0b; color: #000; }
 
-    .depot-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
-    .btn-sm {
-      padding: 5px 12px; border-radius: 5px; border: none;
-      font-size: 12px; cursor: pointer; font-family: inherit;
-    }
+    .btn-xs { padding: 3px 10px; border-radius: 4px; border: none; font-size: 11px; cursor: pointer; font-family: inherit; }
     .btn-edit   { background: rgba(255,255,255,0.1); color: white; }
-    .btn-edit:hover { background: rgba(255,255,255,0.18); }
-    .btn-delete { background: rgba(239,68,68,0.15); color: #f87171; }
-    .btn-delete:hover { background: rgba(239,68,68,0.25); }
-    .btn-set-main { background: rgba(59,130,246,0.15); color: #60a5fa; }
-    .btn-set-main:hover { background: rgba(59,130,246,0.25); }
+    .btn-edit:hover { background: rgba(255,255,255,0.2); }
+    .btn-del    { background: rgba(239,68,68,0.15); color: #f87171; }
+    .btn-del:hover { background: rgba(239,68,68,0.28); }
 
-    /* 追加フォーム */
-    .add-form {
-      background: #161f2c;
-      border: 1px dashed rgba(255,255,255,0.15);
-      border-radius: 12px;
-      padding: 24px;
-    }
-    .add-form h3 { font-size: 14px; font-weight: 700; margin-bottom: 16px; color: rgba(255,255,255,0.8); }
-    .form-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-bottom: 12px;
-    }
-    .form-group { display: flex; flex-direction: column; gap: 5px; }
-    .form-group label { font-size: 11px; color: rgba(255,255,255,0.4); letter-spacing: 0.05em; }
-    .form-group input {
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.12);
-      color: white; border-radius: 6px;
-      padding: 8px 12px; font-size: 13px; font-family: inherit;
-    }
-    .form-group select {
-      background: white;
-      border: 1px solid rgba(255,255,255,0.12);
-      color: #1a1a1a; border-radius: 6px;
-      padding: 8px 12px; font-size: 13px; font-family: inherit;
-    }
-    .form-group input:focus, .form-group select:focus {
-      outline: none; border-color: #3b82f6;
-    }
-    .form-group input::placeholder { color: rgba(255,255,255,0.25); }
-    .form-group.full { grid-column: 1 / -1; }
-    .form-actions { display: flex; gap: 10px; margin-top: 4px; }
-    .btn-primary {
-      padding: 9px 20px; background: #3b82f6; color: white;
-      border: none; border-radius: 6px; cursor: pointer;
-      font-size: 13px; font-family: inherit; font-weight: 500;
-    }
-    .btn-primary:hover { background: #2563eb; }
-    .btn-secondary {
-      padding: 9px 16px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6);
-      border: none; border-radius: 6px; cursor: pointer;
-      font-size: 13px; font-family: inherit;
-    }
+    /* 右：追加フォーム */
+    .add-form { background: #161f2c; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; }
+    .add-form h3 { font-size: 13px; font-weight: 700; margin-bottom: 14px; color: rgba(255,255,255,0.8); }
+    .form-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+    .form-group label { font-size: 11px; color: rgba(255,255,255,0.4); }
+    .form-group input { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: white; border-radius: 5px; padding: 7px 10px; font-size: 13px; font-family: inherit; }
+    .form-group input:focus { outline: none; border-color: #f59e0b; }
+    .form-group input::placeholder { color: rgba(255,255,255,0.2); }
+    .form-group select { background: white; color: #1a1a1a; border: 1px solid rgba(255,255,255,0.12); border-radius: 5px; padding: 7px 10px; font-size: 13px; font-family: inherit; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .form-actions { display: flex; gap: 8px; margin-top: 4px; }
+    .btn-add { padding: 8px 18px; background: #f59e0b; color: #000; border: none; border-radius: 5px; cursor: pointer; font-size: 13px; font-family: inherit; font-weight: 700; }
+    .btn-add:hover { background: #d97706; }
+    .btn-clr { padding: 8px 14px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.5); border: none; border-radius: 5px; cursor: pointer; font-size: 13px; font-family: inherit; }
 
-    /* CSV拠点コード紐付け */
-    .mapping-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .mapping-table th {
-      text-align: left; font-size: 11px; color: rgba(255,255,255,0.4);
-      padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.08);
-      letter-spacing: 0.05em;
-    }
-    .mapping-table td {
-      padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.05);
-      font-size: 13px;
-    }
-    .mapping-table tr:last-child td { border-bottom: none; }
-    .mapping-table select {
-      background: white;
-      border: 1px solid rgba(255,255,255,0.12);
-      color: #1a1a1a; border-radius: 5px;
-      padding: 5px 10px; font-size: 12px; font-family: inherit;
-      min-width: 180px;
-    }
-    .code-badge {
-      background: rgba(255,255,255,0.08);
-      font-family: monospace; font-size: 12px;
-      padding: 3px 8px; border-radius: 4px; color: #93c5fd;
-    }
+    /* CSV紐付け */
+    .mapping-section { margin-top: 24px; }
+    .mapping-row { display: flex; align-items: center; gap: 12px; padding: 8px 14px; background: #161f2c; border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; margin-bottom: 6px; font-size: 13px; }
+    .code-badge { background: rgba(255,255,255,0.08); font-family: monospace; font-size: 12px; padding: 2px 8px; border-radius: 4px; color: #93c5fd; flex-shrink: 0; }
+    .mapping-row select { background: white; color: #1a1a1a; border: 1px solid #ddd; border-radius: 4px; padding: 4px 8px; font-size: 12px; font-family: inherit; flex: 1; }
+    .mapping-addr { font-size: 11px; color: rgba(255,255,255,0.3); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* 保存ボタン */
-    .save-bar {
-      position: fixed; bottom: 0; left: 0; right: 0;
-      background: #0f1923;
-      border-top: 1px solid rgba(255,255,255,0.08);
-      padding: 16px 40px;
-      display: flex; align-items: center; justify-content: space-between;
-    }
+    .save-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #0f1923; border-top: 1px solid rgba(255,255,255,0.08); padding: 14px 32px; display: flex; align-items: center; justify-content: space-between; }
     .save-bar span { font-size: 12px; color: rgba(255,255,255,0.4); }
-    .btn-save {
-      padding: 10px 28px; background: #10b981; color: white;
-      border: none; border-radius: 7px; cursor: pointer;
-      font-size: 14px; font-family: inherit; font-weight: 700;
-    }
-    .btn-save:hover { background: #059669; }
-
-    .toast {
-      display: none; position: fixed; top: 20px; left: 50%;
-      transform: translateX(-50%);
-      background: #10b981; color: white;
-      padding: 10px 24px; border-radius: 20px;
-      font-size: 13px; box-shadow: 0 2px 12px rgba(0,0,0,0.3);
-      z-index: 999;
-    }
-
-    @media (max-width: 640px) {
-      header { padding: 16px 20px; }
-      main { padding: 20px; }
-      .form-grid { grid-template-columns: 1fr; }
-      .save-bar { padding: 12px 20px; }
-    }
+    .btn-save { padding: 9px 24px; background: #f59e0b; color: #000; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-family: inherit; font-weight: 700; }
+    .toast { display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 10px 24px; border-radius: 20px; font-size: 13px; box-shadow: 0 2px 12px rgba(0,0,0,0.3); z-index: 999; }
+    .empty-msg { font-size: 12px; color: rgba(255,255,255,0.3); padding: 12px 0; }
+    @media(max-width:700px){ .layout{grid-template-columns:1fr;} .form-row{grid-template-columns:1fr;} header{padding:16px 20px;} main{padding:16px 20px 100px;} }
   </style>
 </head>
 <body>
-
 <header>
   <button class="back-btn" onclick="location.href='menu.html'">← メニュー</button>
-  <div>
-    <h1>🏭 拠点管理</h1>
-    <p>デポ・協力会社の住所登録とCSV拠点コードの紐付け</p>
-  </div>
+  <div><h1>🏭 拠点管理</h1><p>デポ・運送会社の登録とCSV拠点コードの紐付け</p></div>
 </header>
-
 <main>
+  <div class="layout">
+    <!-- 左：登録済みリスト -->
+    <div>
+      <div class="section-title">登録済み拠点・運送会社</div>
+      <div class="depot-grid" id="depot-list"></div>
 
-  <!-- 登録済み拠点 -->
-  <div class="section">
-    <div class="section-title">登録済み拠点</div>
-    <div id="depot-list"></div>
-  </div>
-
-  <!-- 拠点追加フォーム -->
-  <div class="section">
-    <div class="section-title">拠点を追加</div>
-    <div class="add-form">
-      <h3>新しい拠点・協力会社を登録</h3>
-      <div class="form-grid">
-        <div class="form-group">
-          <label>拠点名 *</label>
-          <input type="text" id="new-name" placeholder="例：神戸デポ、〇〇運輸">
-        </div>
-        <div class="form-group">
-          <label>種別</label>
-          <select id="new-type">
-            <option value="main">メインデポ</option>
-            <option value="sub">サブデポ</option>
-            <option value="partner">協力会社</option>
-          </select>
-        </div>
-        <div class="form-group full">
-          <label>積み込みデポ（任意）</label>
-          <select id="new-load-addr" style="background:white;color:#1a1a1a;border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:8px 12px;font-size:13px;font-family:inherit;width:100%;">
-            <option value="">-- 選択しない --</option>
-          </select>
-        </div>
-        <div class="form-group full">
-          <label>出発住所（積み込みと同じ場合は空欄）</label>
-          <input type="text" id="new-depart-addr" placeholder="協力会社から出発する場合のみ入力">
-        </div>
-        <div class="form-group">
-          <label>CSV拠点コード（わかる場合）</label>
-          <input type="text" id="new-code" placeholder="例：2806">
-        </div>
-        <div class="form-group">
-          <label>緯度（空欄で自動取得）</label>
-          <input type="text" id="new-lat" placeholder="例：34.6664">
-        </div>
+      <!-- CSV紐付け -->
+      <div class="mapping-section">
+        <div class="section-title" style="margin-top:20px;">CSV拠点コードの紐付け</div>
+        <div id="mapping-list"></div>
+        <p style="font-size:11px;color:rgba(255,255,255,0.25);margin-top:6px;">CSVを読み込むと自動認識されます</p>
       </div>
-      <div class="form-actions">
-        <button class="btn-primary" onclick="addDepot()">＋ 追加</button>
-        <button class="btn-secondary" onclick="clearForm()">クリア</button>
+    </div>
+
+    <!-- 右：追加フォーム -->
+    <div>
+      <div class="section-title">拠点・運送会社を追加</div>
+      <div class="add-form">
+        <h3 id="form-title">新規登録</h3>
+        <div class="form-group">
+          <label>名称 *</label>
+          <input type="text" id="new-name" placeholder="例：神戸西デポ、三光運輸">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>種別</label>
+            <select id="new-type">
+              <option value="main">メインデポ</option>
+              <option value="sub">サブデポ</option>
+              <option value="own">自社協力会社</option>
+              <option value="carrier">運送会社</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>運送会社コード（運送会社のみ）</label>
+            <input type="text" id="new-carrier-code" placeholder="例：S001">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>住所</label>
+          <input type="text" id="new-addr" placeholder="例：兵庫県神戸市西区見津が丘7丁目1-3">
+        </div>
+        <div class="form-group">
+          <label>出発住所（住所と異なる場合）</label>
+          <input type="text" id="new-depart" placeholder="空欄の場合は上の住所を使用">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>CSV拠点コード</label>
+            <input type="text" id="new-code" placeholder="例：2806">
+          </div>
+          <div class="form-group">
+            <label>備考</label>
+            <input type="text" id="new-note" placeholder="メモ">
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn-add" onclick="addDepot()">＋ 登録</button>
+          <button class="btn-clr" onclick="clearForm()">クリア</button>
+        </div>
       </div>
     </div>
   </div>
-
-  <!-- CSV拠点コード紐付け -->
-  <div class="section" id="mapping-section">
-    <div class="section-title">CSV拠点コードの紐付け</div>
-    <div style="background:#161f2c;border:1px solid rgba(255,255,255,0.08);border-radius:12px;overflow:hidden;">
-      <table class="mapping-table">
-        <thead>
-          <tr>
-            <th>CSV拠点コード</th>
-            <th>割り当て拠点</th>
-            <th>説明</th>
-          </tr>
-        </thead>
-        <tbody id="mapping-tbody"></tbody>
-      </table>
-    </div>
-    <p style="font-size:11px;color:rgba(255,255,255,0.3);margin-top:8px;">
-      ※ CSVを読み込むと拠点コードが自動認識されます。ここで割り当てを設定してください。
-    </p>
-  </div>
-
-  <div style="height:80px;"></div>
 </main>
 
 <div class="save-bar">
   <span>変更は自動保存されます</span>
-  <button class="btn-save" onclick="saveAll()">💾 保存して配車画面へ</button>
+  <button class="btn-save" onclick="location.href='menu.html'">← メニューに戻る</button>
 </div>
-
 <div class="toast" id="toast"></div>
 
 <script>
-// ===== データ管理 =====
-let depots = [];
-let mappings = {}; // { csvCode: depotId }
+let depots = [], mappings = {};
 
 function loadData() {
   try {
@@ -305,213 +172,163 @@ function loadData() {
     if (d) depots = JSON.parse(d);
     if (m) mappings = JSON.parse(m);
   } catch(e) {}
-
-  // デフォルト拠点（初回のみ）
   if (depots.length === 0) {
     depots = [
-      {
-        id: 1, name: '神戸デポ', type: 'main',
-        loadAddr: '兵庫県神戸市西区見津が丘7丁目1-3',
-        departAddr: '',
-        csvCode: '2806',
-        lat: 34.6664, lng: 135.0059
-      },
-      {
-        id: 2, name: '丹波デポ', type: 'sub',
-        loadAddr: '兵庫県丹波市氷上町氷上10',
-        departAddr: '',
-        csvCode: '2805',
-        lat: 35.1167, lng: 135.0059
-      }
+      { id:1, name:'神戸西デポ', type:'main', addr:'兵庫県神戸市西区見津が丘7丁目1-3', departAddr:'', csvCode:'2806', carrierCode:'', lat:34.6664, lng:135.0059 },
+      { id:2, name:'丹波デポ',   type:'sub',  addr:'兵庫県丹波市氷上町氷上10',           departAddr:'', csvCode:'2805', carrierCode:'', lat:35.1167, lng:135.0167 }
     ];
-    mappings = { '2806': 1, '2805': 2 };
+    mappings = { '2806':1, '2805':2 };
     saveData();
   }
 }
-
 function saveData() {
   localStorage.setItem('haisha_depots', JSON.stringify(depots));
   localStorage.setItem('haisha_mappings', JSON.stringify(mappings));
 }
 
-// ===== 描画 =====
-function render() {
-  renderDepotList();
-  renderMappings();
-  updateLoadAddrSelect();
+const TYPE_ORDER = { main:0, sub:1, own:2, carrier:3 };
+const TYPE_LABEL = { main:'メインデポ', sub:'サブデポ', own:'自社協力会社', carrier:'運送会社' };
+const TYPE_CLASS = { main:'badge-main', sub:'badge-sub', own:'badge-own', carrier:'badge-carrier' };
+const ROW_CLASS  = { main:'type-main', sub:'type-sub', own:'type-own', carrier:'type-carrier' };
+
+function getSortKey(d) {
+  const base = TYPE_ORDER[d.type] ?? 9;
+  // 運送会社はコード順、その他は登録順（id順）
+  if (d.type === 'carrier') return `${base}_${(d.carrierCode||'zzz').padStart(10,'0')}`;
+  return `${base}_${String(d.id).padStart(15,'0')}`;
 }
 
-function renderDepotList() {
-  const list = document.getElementById('depot-list');
-  list.innerHTML = '';
+function render() {
+  renderList();
+  renderMappings();
+}
 
-  if (depots.length === 0) {
-    list.innerHTML = '<p style="font-size:13px;color:rgba(255,255,255,0.3);">拠点が登録されていません</p>';
-    return;
-  }
+function renderList() {
+  const el = document.getElementById('depot-list');
+  el.innerHTML = '';
+  if (depots.length === 0) { el.innerHTML = '<p class="empty-msg">登録されていません</p>'; return; }
 
-  // メインデポを先頭に並べ替え
-  const typeOrder = {'main':0, 'sub':1, 'own':2, 'partner':3};
-  const sorted = [...depots].sort((a,b) => (typeOrder[a.type]||9) - (typeOrder[b.type]||9));
+  const sorted = [...depots].sort((a,b) => getSortKey(a).localeCompare(getSortKey(b)));
+  sorted.forEach(d => {
+    const badgeClass = TYPE_CLASS[d.type] || 'badge-carrier';
+    const badgeText  = TYPE_LABEL[d.type] || d.type;
+    const rowClass   = ROW_CLASS[d.type]  || 'type-carrier';
+    const line2parts = [];
+    if (d.addr)        line2parts.push(d.addr);
+    if (d.departAddr)  line2parts.push('出発:'+d.departAddr);
+    if (d.carrierCode) line2parts.push('コード:'+d.carrierCode);
+    if (d.csvCode)     line2parts.push('CSV:'+d.csvCode);
 
-  sorted.forEach(depot => {
-    const badgeClass = depot.type === 'main' ? 'badge-main' : depot.type === 'sub' ? 'badge-sub' : depot.type === 'own' ? 'badge-own' : 'badge-partner';
-    const badgeText  = depot.type === 'main' ? 'メインデポ' : depot.type === 'sub' ? 'サブデポ' : depot.type === 'own' ? '自社協力会社' : '協力会社';
-    const cardClass  = depot.type === 'main' ? 'depot-card main-depot' : depot.type === 'own' ? 'depot-card own-depot' : 'depot-card';
-    const departInfo = depot.departAddr ? `<div style="font-size:12px;color:#f59e0b;margin-top:4px;">🚗 出発地: ${depot.departAddr}</div>` : '';
-
-    const div = document.createElement('div');
-    div.className = cardClass;
-    div.innerHTML = `
-      <div class="depot-card-header">
-        <div>
-          ${depot.csvCode ? `<div class="depot-code">拠点コード: ${depot.csvCode}</div>` : ''}
-          <div class="depot-name">${depot.name}</div>
-          <div class="depot-addr">📦 積み込み: ${depot.loadAddr}</div>
-          ${departInfo}
+    const row = document.createElement('div');
+    row.className = `depot-row ${rowClass}`;
+    row.innerHTML = `
+      <div class="depot-row-info">
+        <div class="depot-row-line1">
+          <span class="depot-row-name">${d.name}</span>
+          <span class="badge ${badgeClass}">${badgeText}</span>
         </div>
-        <span class="depot-badge ${badgeClass}">${badgeText}</span>
+        <div class="depot-row-line2">${line2parts.join('　')}</div>
       </div>
-      <div class="depot-actions">
-        <button class="btn-sm btn-edit" onclick="editDepot(${depot.id})">✏️ 編集</button>
-        <button class="btn-sm btn-delete" onclick="deleteDepot(${depot.id})">削除</button>
+      <div class="depot-row-actions">
+        <button class="btn-xs btn-edit" onclick="editDepot(${d.id})">編集</button>
+        <button class="btn-xs btn-del"  onclick="deleteDepot(${d.id})">削除</button>
       </div>
     `;
-    list.appendChild(div);
-  });
-}
-
-function updateLoadAddrSelect() {
-  const sel = document.getElementById('new-load-addr');
-  if (!sel) return;
-  sel.innerHTML = '<option value="">-- 選択しない --</option>';
-  depots.filter(d => d.type === 'main' || d.type === 'sub').forEach(d => {
-    const opt = document.createElement('option');
-    opt.value = d.id;
-    opt.textContent = d.name + (d.loadAddr ? '（'+d.loadAddr+'）' : '');
-    sel.appendChild(opt);
+    el.appendChild(row);
   });
 }
 
 function renderMappings() {
-  // 全拠点コードを収集（登録済み + mappingsにあるもの）
   const allCodes = new Set();
   depots.forEach(d => { if (d.csvCode) allCodes.add(d.csvCode); });
   Object.keys(mappings).forEach(c => allCodes.add(c));
-
-  const tbody = document.getElementById('mapping-tbody');
-  tbody.innerHTML = '';
-
-  if (allCodes.size === 0) {
-    tbody.innerHTML = '<tr><td colspan="3" style="color:rgba(255,255,255,0.3);font-size:12px;">CSVを読み込むと自動的にコードが表示されます</td></tr>';
-    return;
-  }
-
+  const el = document.getElementById('mapping-list');
+  el.innerHTML = '';
+  if (allCodes.size === 0) { el.innerHTML = '<p class="empty-msg">CSVを読み込むと表示されます</p>'; return; }
   Array.from(allCodes).sort().forEach(code => {
-    const currentDepotId = mappings[code];
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><span class="code-badge">${code}</span></td>
-      <td>
-        <select onchange="updateMapping('${code}', this.value)">
-          <option value="">-- 未設定 --</option>
-          ${depots.map(d => `<option value="${d.id}" ${currentDepotId == d.id ? 'selected' : ''}>${d.name}</option>`).join('')}
-        </select>
-      </td>
-      <td style="color:rgba(255,255,255,0.4);font-size:12px;">
-        ${currentDepotId ? (depots.find(d=>d.id==currentDepotId)||{}).loadAddr || '' : '未設定'}
-      </td>
+    const cur = mappings[code];
+    const depot = cur ? depots.find(d => d.id == cur) : null;
+    const row = document.createElement('div');
+    row.className = 'mapping-row';
+    row.innerHTML = `
+      <span class="code-badge">${code}</span>
+      <select onchange="updateMapping('${code}',this.value)">
+        <option value="">-- 未設定 --</option>
+        ${depots.map(d=>`<option value="${d.id}" ${cur==d.id?'selected':''}>${d.name}</option>`).join('')}
+      </select>
+      <span class="mapping-addr">${depot ? (depot.addr||depot.name) : '未設定'}</span>
     `;
-    tbody.appendChild(tr);
+    el.appendChild(row);
   });
 }
 
-// ===== 操作 =====
 function addDepot() {
-  const name      = document.getElementById('new-name').value.trim();
-  const type      = document.getElementById('new-type').value;
-  const loadAddrId = document.getElementById('new-load-addr').value;
-  const loadAddrDepot = loadAddrId ? depots.find(d=>String(d.id)===loadAddrId) : null;
-  const loadAddr = loadAddrDepot ? loadAddrDepot.loadAddr || loadAddrDepot.name : '';
-  const departAddr= document.getElementById('new-depart-addr').value.trim();
-  const csvCode   = document.getElementById('new-code').value.trim();
-  const latVal    = parseFloat(document.getElementById('new-lat').value) || null;
-
-  if (!name) { alert('拠点名は必須です'); return; }
-
-  const id = Date.now();
-  depots.push({ id, name, type, loadAddr, departAddr, csvCode, lat: latVal, lng: null });
-
-  if (csvCode) mappings[csvCode] = id;
-
-  saveData();
-  render();
-  clearForm();
-  showToast('拠点を追加しました');
+  const name        = document.getElementById('new-name').value.trim();
+  const type        = document.getElementById('new-type').value;
+  const addr        = document.getElementById('new-addr').value.trim();
+  const departAddr  = document.getElementById('new-depart').value.trim();
+  const csvCode     = document.getElementById('new-code').value.trim();
+  const carrierCode = document.getElementById('new-carrier-code').value.trim();
+  const note        = document.getElementById('new-note').value.trim();
+  if (!name) { alert('名称は必須です'); return; }
+  const editId = parseInt(document.getElementById('form-title').dataset.editId || '0');
+  if (editId) {
+    const idx = depots.findIndex(d => d.id === editId);
+    if (idx >= 0) depots[idx] = { ...depots[idx], name, type, addr, departAddr, csvCode, carrierCode, note };
+    document.getElementById('form-title').textContent = '新規登録';
+    document.getElementById('form-title').dataset.editId = '';
+  } else {
+    const id = Date.now();
+    depots.push({ id, name, type, addr, departAddr, csvCode, carrierCode, note, lat:null, lng:null });
+    if (csvCode) mappings[csvCode] = id;
+  }
+  saveData(); render(); clearForm();
+  showToast(editId ? '更新しました' : '登録しました');
 }
 
 function editDepot(id) {
-  const depot = depots.find(d => d.id === id);
-  if (!depot) return;
-
-  document.getElementById('new-name').value       = depot.name;
-  document.getElementById('new-type').value       = depot.type;
-  document.getElementById('new-load-addr').value  = depot.loadAddr;
-  document.getElementById('new-depart-addr').value= depot.departAddr || '';
-  document.getElementById('new-code').value       = depot.csvCode || '';
-  document.getElementById('new-lat').value        = depot.lat || '';
-
-  // 削除して再追加（簡易編集）
-  depots = depots.filter(d => d.id !== id);
-  saveData();
-  showToast('編集内容を入力して「追加」を押してください');
+  const d = depots.find(x => x.id === id);
+  if (!d) return;
+  document.getElementById('new-name').value        = d.name;
+  document.getElementById('new-type').value        = d.type;
+  document.getElementById('new-addr').value        = d.addr || '';
+  document.getElementById('new-depart').value      = d.departAddr || '';
+  document.getElementById('new-code').value        = d.csvCode || '';
+  document.getElementById('new-carrier-code').value= d.carrierCode || '';
+  document.getElementById('new-note').value        = d.note || '';
+  document.getElementById('form-title').textContent = `編集: ${d.name}`;
+  document.getElementById('form-title').dataset.editId = d.id;
+  window.scrollTo(0, 0);
 }
 
 function deleteDepot(id) {
-  if (!confirm('この拠点を削除しますか？')) return;
-  depots = depots.filter(d => d.id !== id);
-  // mappingsからも削除
-  Object.keys(mappings).forEach(code => {
-    if (mappings[code] === id) delete mappings[code];
-  });
-  saveData();
-  render();
-  showToast('削除しました');
+  const d = depots.find(x => x.id === id);
+  if (!d || !confirm(`「${d.name}」を削除しますか？`)) return;
+  depots = depots.filter(x => x.id !== id);
+  Object.keys(mappings).forEach(c => { if (mappings[c] == id) delete mappings[c]; });
+  saveData(); render(); showToast('削除しました');
 }
 
 function updateMapping(code, depotId) {
-  if (depotId) {
-    mappings[code] = parseInt(depotId);
-  } else {
-    delete mappings[code];
-  }
-  saveData();
-  renderMappings();
+  if (depotId) mappings[code] = parseInt(depotId);
+  else delete mappings[code];
+  saveData(); renderMappings();
 }
 
 function clearForm() {
-  ['new-name','new-load-addr','new-depart-addr','new-code','new-lat'].forEach(id => {
-    document.getElementById(id).value = '';
-  });
-  document.getElementById('new-type').value = 'sub';
-}
-
-function saveAll() {
-  saveData();
-  showToast('保存しました！');
-  setTimeout(() => location.href = 'index.html', 1000);
+  ['new-name','new-addr','new-depart','new-code','new-carrier-code','new-note'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('new-type').value = 'main';
+  document.getElementById('form-title').textContent = '新規登録';
+  document.getElementById('form-title').dataset.editId = '';
 }
 
 function showToast(msg) {
   const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.style.display = 'block';
+  t.textContent = msg; t.style.display = 'block';
   setTimeout(() => t.style.display = 'none', 2500);
 }
 
-// ===== 初期化 =====
-loadData();
-render();
+loadData(); render();
 </script>
 </body>
 </html>
