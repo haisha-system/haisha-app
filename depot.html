@@ -19,7 +19,7 @@
     header h1 { font-size: 18px; font-weight: 700; }
     header p  { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 2px; }
 
-    main { max-width: 1200px; margin: 0 auto; padding: 24px 32px 100px; }
+    main { max-width: 1200px; margin: 0 auto; padding: 24px 32px 40px; }
     .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
     .section-title { font-size: 11px; letter-spacing: 0.15em; color: #f59e0b; font-weight: 500; margin-bottom: 12px; text-transform: uppercase; }
 
@@ -77,9 +77,7 @@
     .mapping-row select { background: white; color: #1a1a1a; border: 1px solid #ddd; border-radius: 4px; padding: 4px 8px; font-size: 12px; font-family: inherit; flex: 1; }
     .mapping-addr { font-size: 11px; color: rgba(255,255,255,0.3); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    .save-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #0f1923; border-top: 1px solid rgba(255,255,255,0.08); padding: 14px 32px; display: flex; align-items: center; justify-content: space-between; }
-    .save-bar span { font-size: 12px; color: rgba(255,255,255,0.4); }
-    .btn-save { padding: 9px 24px; background: #f59e0b; color: #000; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-family: inherit; font-weight: 700; }
+
     .toast { display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 10px 24px; border-radius: 20px; font-size: 13px; box-shadow: 0 2px 12px rgba(0,0,0,0.3); z-index: 999; }
     .empty-msg { font-size: 12px; color: rgba(255,255,255,0.3); padding: 12px 0; }
     @media(max-width:700px){ .layout{grid-template-columns:1fr;} .form-row{grid-template-columns:1fr;} header{padding:16px 20px;} main{padding:16px 20px 100px;} }
@@ -152,10 +150,7 @@
   </div>
 </main>
 
-<div class="save-bar">
-  <span>変更は自動保存されます</span>
-  <button class="btn-save" onclick="location.href='menu.html'">← メニューに戻る</button>
-</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
