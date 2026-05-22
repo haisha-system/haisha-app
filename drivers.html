@@ -281,12 +281,12 @@ function addDriver() {
   const editId = document.getElementById('form-title').dataset.editId || '';
   if (editId) {
     const idx = drivers.findIndex(d => String(d.id) === String(editId));
-    if (idx >= 0) drivers[idx] = { ...drivers[idx], name, code, depot, vehicle, phone, area, note };
+    if (idx >= 0) drivers[idx] = { ...drivers[idx], name, code, depot, vehicle, phone, area, carrier, yoizumi, note };
     document.getElementById('form-title').textContent = '新規登録';
     document.getElementById('form-title').dataset.editId = '';
     showToast('更新しました');
   } else {
-    if (drivers.find(d => d.code === code && d.id !== editId)) { alert('この社員コードは既に使用されています'); return; }
+    if (drivers.find(d => d.code === code)) { alert('この社員コードは既に使用されています'); return; }
     drivers.push({ id: Date.now(), name, code, depot, vehicle, phone, area, carrier, yoizumi, note });
     showToast(`${name} を登録しました`);
   }
