@@ -44,7 +44,7 @@
     .driver-row {
       background: #161f2c; border: 1px solid rgba(255,255,255,0.08);
       border-radius: 8px; padding: 9px 12px;
-      display: grid; grid-template-columns: 32px 1fr auto;
+      display: grid; grid-template-columns: 28px 36px 1fr auto;
       gap: 8px; align-items: center;
     }
     .driver-row:hover { border-color: rgba(255,255,255,0.18); }
@@ -230,9 +230,7 @@ function renderList() {
     if (d.availableToday === false) row.style.opacity = '0.4';
     if (d.yoizumiToday) row.style.background = 'rgba(139,92,246,0.12)';
     row.innerHTML = `
-      <label style="cursor:pointer;flex-shrink:0;margin-right:8px;" title="本日稼働">
-        <input type="checkbox" ${d.availableToday!==false?'checked':''} onchange="toggleAvailable(${d.id},this.checked)" style="width:20px;height:20px;cursor:pointer;accent-color:#10b981;vertical-align:middle;">
-      </label>
+      <input type="checkbox" ${d.availableToday!==false?'checked':''} onchange="toggleAvailable(${d.id},this.checked)" style="width:20px;height:20px;cursor:pointer;accent-color:#10b981;justify-self:center;">
       <div class="driver-avatar" style="background:${color};">${initial}</div>
       <div class="driver-info">
         <div class="driver-line1">
@@ -242,7 +240,7 @@ function renderList() {
         </div>
         <div class="driver-line2">${line2parts.join('　')||''}</div>
       </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;">
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;">
         <div style="display:flex;gap:5px;">
           <button class="btn-xs btn-edit" onclick="editDriver(${d.id})">編集</button>
           <button class="btn-xs btn-del" onclick="deleteDriver(${d.id})">削除</button>
