@@ -333,18 +333,23 @@ function setDepotByCode(csvCode) {
   if (!depot) return;
 
   const useAddr = depot.departAddr || depot.loadAddr;
-  // 拠点コードから座標を決定（登録されていない場合はデフォルト）
-  const knownCoords = {
-    '2806': { lat: 34.6664, lng: 135.0059 }, // 神戸西デポ
-    '2805': { lat: 35.1167, lng: 135.0167 }, // 丹波デポ
-  };
-  const coords = knownCoords[csvCode] || { lat: depot.lat || 34.6664, lng: depot.lng || 135.0059 };
   DEPOT = {
-    lat:  coords.lat,
-    lng:  coords.lng,
+    lat:  depot.lat || 34.6664,
+    lng:  depot.lng || 135.0059,
     name: depot.name,
     addr: useAddr
   };
+  // 住所からGeocodingで正確な座標を取得
+  if (map) {
+    const gc = new google.maps.Geocoder();
+    gc.geocode({ address: useAddr }, (results, status) => {
+      if (status === 'OK') {
+        DEPOT.lat = results[0].geometry.location.lat();
+        DEPOT.lng = results[0].geometry.location.lng();
+        if (depotMarker) depotMarker.setPosition({ lat: DEPOT.lat, lng: DEPOT.lng });
+      }
+    });
+  }
 
   // デポ情報をサイドバーに反映
   const nameEl = document.querySelector('.depot-name');
@@ -417,6 +422,15 @@ function initMap() {
     label: { text: '出', color: 'white', fontSize: '10px', fontWeight: 'bold' }
   });
   depotMarker.addListener('click', () => new google.maps.InfoWindow({ content: `<b>🏭 出発地</b><br>${DEPOT.name}<br><small>${DEPOT.addr}</small>` }).open(map, depotMarker));
+  // デポ座標をGeocodingで正確に取得
+  const geocoder = new google.maps.Geocoder();
+  geocoder.geocode({ address: DEPOT.addr }, (results, status) => {
+    if (status === 'OK') {
+      DEPOT.lat = results[0].geometry.location.lat();
+      DEPOT.lng = results[0].geometry.location.lng();
+      depotMarker.setPosition({ lat: DEPOT.lat, lng: DEPOT.lng });
+    }
+  });
   setTimeout(() => {
     loadPendingFile();
     // pendingFileがなければsessionStorageから復元
@@ -1248,19 +1262,13 @@ function renderRightSidebar() {
     const driver = drivers.find(d => d.id === activeDriverFilter);
     const dName = driver ? driver.name : '不明';
     title.textContent = `${dName} の配送先`;
-    // ルート順（orderedLocations）があれば使用
+    // orderedLocationsから該当ドライバーの分だけ取り出す（drawRouteと同じ順番）
     if (orderedLocations.length > 0) {
-      const driverLocs = [];
-      [1,2].forEach(bin => {
-        const binLocs = locations.map((loc,i)=>({loc,i}))
-          .filter(({i})=>assignments[i]&&assignments[i].driverId===activeDriverFilter&&assignments[i].bin===bin);
-        if (binLocs.length===0) return;
-        const ls = binLocs.map(({loc})=>loc);
-        const ri = nearestNeighbor(ls, DEPOT);
-        ri.forEach(idx => driverLocs.push({loc:ls[idx], i:locations.indexOf(ls[idx])}));
-      });
-      locs = driverLocs;
+      locs = orderedLocations
+        .map(loc => ({ loc, i: locations.indexOf(loc) }))
+        .filter(({ i }) => i >= 0 && assignments[i] && assignments[i].driverId === activeDriverFilter);
     } else {
+      // ルート未表示時は割り当て順で表示
       locs = locations.map((loc, i) => ({loc, i}))
         .filter(({i}) => assignments[i] && assignments[i].driverId === activeDriverFilter);
     }
