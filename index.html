@@ -309,6 +309,12 @@ let DEPOT = {
 const DEPOT_KOBE  = { lat: 34.6823, lng: 135.0103 };
 const DEPOT_TAMBA = { lat: 35.1167, lng: 135.0167 };
 
+// デポの正しい座標（住所から確認済み）
+const DEPOT_CORRECT_COORDS = {
+  '兵庫県神戸市西区見津が丘7丁目1-3': { lat: 34.6823, lng: 135.0103 },
+  '兵庫県丹波市氷上町氷上10':         { lat: 35.1167, lng: 135.0167 }
+};
+
 function loadDepotsFromStorage() {
   try {
     const d = localStorage.getItem('haisha_depots');
@@ -318,10 +324,28 @@ function loadDepotsFromStorage() {
   } catch(e) {}
   if (!window._depots) {
     window._depots = [
-      { id:1, name:'神戸デポ', loadAddr:'兵庫県神戸市西区見津が丘7丁目1-3', departAddr:'', csvCode:'2806', lat:34.6664, lng:135.0059 },
+      { id:1, name:'神戸デポ', loadAddr:'兵庫県神戸市西区見津が丘7丁目1-3', departAddr:'', csvCode:'2806', lat:34.6823, lng:135.0103 },
       { id:2, name:'丹波デポ', loadAddr:'兵庫県丹波市氷上町氷上10', departAddr:'', csvCode:'2805', lat:35.1167, lng:135.0167 }
     ];
     window._mappings = { '2806':1, '2805':2 };
+  }
+  // localStorageに古い座標が保存されている場合は自動補正する
+  let needsSave = false;
+  (window._depots || []).forEach(depot => {
+    const addr = depot.loadAddr || '';
+    const correct = DEPOT_CORRECT_COORDS[addr];
+    if (correct) {
+      const latOk = Math.abs((depot.lat || 0) - correct.lat) < 0.001;
+      const lngOk = Math.abs((depot.lng || 0) - correct.lng) < 0.001;
+      if (!latOk || !lngOk) {
+        depot.lat = correct.lat;
+        depot.lng = correct.lng;
+        needsSave = true;
+      }
+    }
+  });
+  if (needsSave) {
+    try { localStorage.setItem('haisha_depots', JSON.stringify(window._depots)); } catch(e){}
   }
 }
 
