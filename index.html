@@ -301,17 +301,17 @@ async function checkSupabase() {
 // ===== 定数・状態 =====
 // ===== 拠点設定（depot.htmlで管理） =====
 let DEPOT = {
-  lat: 34.6823, lng: 135.0103,
+  lat: 34.7309, lng: 135.0867,
   name: 'メープルツリー神戸ロジスティクスセンター',
   addr: '兵庫県神戸市西区見津が丘7丁目1-3'
 };
 // デポ座標を正しい値に固定
-const DEPOT_KOBE  = { lat: 34.6823, lng: 135.0103 };
+const DEPOT_KOBE  = { lat: 34.7309, lng: 135.0867 };
 const DEPOT_TAMBA = { lat: 35.1167, lng: 135.0167 };
 
 // デポの正しい座標（住所から確認済み）
 const DEPOT_CORRECT_COORDS = {
-  '兵庫県神戸市西区見津が丘7丁目1-3': { lat: 34.6823, lng: 135.0103 },
+  '兵庫県神戸市西区見津が丘7丁目1-3': { lat: 34.7309, lng: 135.0867 },
   '兵庫県丹波市氷上町氷上10':         { lat: 35.1167, lng: 135.0167 }
 };
 
@@ -324,7 +324,7 @@ function loadDepotsFromStorage() {
   } catch(e) {}
   if (!window._depots) {
     window._depots = [
-      { id:1, name:'神戸デポ', loadAddr:'兵庫県神戸市西区見津が丘7丁目1-3', departAddr:'', csvCode:'2806', lat:34.6823, lng:135.0103 },
+      { id:1, name:'神戸デポ', loadAddr:'兵庫県神戸市西区見津が丘7丁目1-3', departAddr:'', csvCode:'2806', lat:34.7309, lng:135.0867 },
       { id:2, name:'丹波デポ', loadAddr:'兵庫県丹波市氷上町氷上10', departAddr:'', csvCode:'2805', lat:35.1167, lng:135.0167 }
     ];
     window._mappings = { '2806':1, '2805':2 };
@@ -374,7 +374,7 @@ function setDepotByCode(csvCode) {
     document.getElementById('status').textContent += ` ／ 拠点: ${depot.name}`;
   } else {
     // 座標未保存 → まずデフォルト値で設定してからGeocodingで上書き
-    DEPOT = { lat: 34.6823, lng: 135.0103, name: depot.name, addr: useAddr };
+    DEPOT = { lat: 34.7309, lng: 135.0867, name: depot.name, addr: useAddr };
     document.getElementById('status').textContent += ` ／ 拠点: ${depot.name}（座標取得中）`;
     if (map) {
       const gc = new google.maps.Geocoder();
