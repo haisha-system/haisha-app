@@ -1390,10 +1390,8 @@ function renderRightSidebar() {
     const dName = driverIdx >= 0 ? drivers[driverIdx].name : '未割当';
     const bin = asgn ? `第${asgn.bin}便` : '';
 
-    // 番号はループインデックスを直接使う（ルート表示前でも番号を表示）
-    const stopNumStr = activeDriverFilter !== 'unassigned' && activeDriverFilter !== null
-      ? String(loopIdx + 1)
-      : (orderedLocations.length > 0 ? String(loopIdx + 1) : '');
+    // 番号は常に表示（ルート表示前後どちらでも）
+    const stopNumStr = activeDriverFilter !== 'unassigned' ? String(loopIdx + 1) : '';
     card.innerHTML = `
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;">
         <div style="flex:1;min-width:0;">
