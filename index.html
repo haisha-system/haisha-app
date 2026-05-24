@@ -333,23 +333,6 @@ function setDepotByCode(csvCode) {
   if (!depot) return;
 
   const useAddr = depot.departAddr || depot.loadAddr;
-  DEPOT = {
-    lat:  depot.lat || 34.6664,
-    lng:  depot.lng || 135.0059,
-    name: depot.name,
-    addr: useAddr
-  };
-  // 住所からGeocodingで正確な座標を取得
-  if (map) {
-    const gc = new google.maps.Geocoder();
-    gc.geocode({ address: useAddr }, (results, status) => {
-      if (status === 'OK') {
-        DEPOT.lat = results[0].geometry.location.lat();
-        DEPOT.lng = results[0].geometry.location.lng();
-        if (depotMarker) depotMarker.setPosition({ lat: DEPOT.lat, lng: DEPOT.lng });
-      }
-    });
-  }
 
   // デポ情報をサイドバーに反映
   const nameEl = document.querySelector('.depot-name');
@@ -357,13 +340,35 @@ function setDepotByCode(csvCode) {
   if (nameEl) nameEl.textContent = depot.name;
   if (addrEl) addrEl.textContent = useAddr;
 
-  // デポマーカーを更新
-  if (depotMarker) {
-    depotMarker.setPosition({ lat: DEPOT.lat, lng: DEPOT.lng });
-    depotMarker.setTitle(DEPOT.name);
+  // 座標の確定：①localStorageに保存済みならそれを使う、②なければGeocodingで取得
+  if (depot.lat && depot.lng) {
+    DEPOT = { lat: depot.lat, lng: depot.lng, name: depot.name, addr: useAddr };
+    if (depotMarker) {
+      depotMarker.setPosition({ lat: DEPOT.lat, lng: DEPOT.lng });
+      depotMarker.setTitle(DEPOT.name);
+    }
+    document.getElementById('status').textContent += ` ／ 拠点: ${depot.name}`;
+  } else {
+    // 座標未保存 → まずデフォルト値で設定してからGeocodingで上書き
+    DEPOT = { lat: 34.6664, lng: 135.0059, name: depot.name, addr: useAddr };
+    document.getElementById('status').textContent += ` ／ 拠点: ${depot.name}（座標取得中）`;
+    if (map) {
+      const gc = new google.maps.Geocoder();
+      gc.geocode({ address: useAddr }, (results, status) => {
+        if (status === 'OK') {
+          DEPOT.lat = results[0].geometry.location.lat();
+          DEPOT.lng = results[0].geometry.location.lng();
+          // 次回から使えるようlocalStorageに保存
+          depot.lat = DEPOT.lat;
+          depot.lng = DEPOT.lng;
+          try { localStorage.setItem('haisha_depots', JSON.stringify(window._depots)); } catch(e){}
+          if (depotMarker) depotMarker.setPosition({ lat: DEPOT.lat, lng: DEPOT.lng });
+          const s = document.getElementById('status');
+          if (s) s.textContent = s.textContent.replace('（座標取得中）', '');
+        }
+      });
+    }
   }
-
-  document.getElementById('status').textContent += ` ／ 拠点: ${depot.name}`;
 }
 const DRIVER_COLORS = [
   '#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6',
@@ -422,15 +427,8 @@ function initMap() {
     label: { text: '出', color: 'white', fontSize: '10px', fontWeight: 'bold' }
   });
   depotMarker.addListener('click', () => new google.maps.InfoWindow({ content: `<b>🏭 出発地</b><br>${DEPOT.name}<br><small>${DEPOT.addr}</small>` }).open(map, depotMarker));
-  // デポ座標をGeocodingで正確に取得
-  const geocoder = new google.maps.Geocoder();
-  geocoder.geocode({ address: DEPOT.addr }, (results, status) => {
-    if (status === 'OK') {
-      DEPOT.lat = results[0].geometry.location.lat();
-      DEPOT.lng = results[0].geometry.location.lng();
-      depotMarker.setPosition({ lat: DEPOT.lat, lng: DEPOT.lng });
-    }
-  });
+  // 注意：ここではGeocodingしない。DEPOTは loadDepotsFromStorage() で設定済みの座標を使う。
+  // CSVを読み込んだ際は setDepotByCode() で座標が更新される。
   setTimeout(() => {
     loadPendingFile();
     // pendingFileがなければsessionStorageから復元
@@ -441,7 +439,7 @@ function initMap() {
         locations.forEach((loc, i) => {
           const asgn = assignments[i];
           const driverIdx = asgn ? drivers.findIndex(d => d.id === asgn.driverId) : -1;
-          const fillColor = driverIdx >= 0 ? ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22','#34495e','#e91e63','#00bcd4','#ff5722','#607d8b','#795548','#4caf50','#2196f3','#ff9800','#9c27b0','#03a9f4','#8bc34a','#f44336'][driverIdx % 20] : '#e74c3c';
+          const fillColor = driverIdx >= 0 ? DRIVER_COLORS[driverIdx % DRIVER_COLORS.length] : '#e74c3c';
           const marker = new google.maps.Marker({
             position: { lat: loc.lat, lng: loc.lng }, map, title: loc.name,
             label: { text: String(i+1), color: 'white', fontSize: '11px', fontWeight: 'bold' },
@@ -452,7 +450,10 @@ function initMap() {
           }).open(map, marker));
           markers.push(marker);
         });
+        // 問題C修正：locations件数に関わらず必ずサイドバーを更新する
         updateSidebar(locations, false);
+        renderDriverSidebar();
+        renderRightSidebar();
         if (locations.length > 0) {
           const bounds = new google.maps.LatLngBounds();
           bounds.extend({ lat: DEPOT.lat, lng: DEPOT.lng });
@@ -460,8 +461,6 @@ function initMap() {
           map.fitBounds(bounds);
           document.getElementById('status').textContent = `${locations.length}件（前回データ復元）`;
           if (depotMarker) depotMarker.setPosition({ lat: DEPOT.lat, lng: DEPOT.lng });
-          renderDriverSidebar();
-          renderRightSidebar();
         }
       }
     }
