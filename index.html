@@ -309,6 +309,57 @@ let DEPOT = {
 const DEPOT_KOBE  = { lat: 34.7309, lng: 135.0867 };
 const DEPOT_TAMBA = { lat: 35.1167, lng: 135.0167 };
 
+// ====================================================
+// Geocoding共通関数（レート制限対応・順番保証）
+// ====================================================
+/**
+ * 住所リストを順番を保証しながらGeocoding
+ * @param {string[]} addresses - 住所の配列
+ * @param {function} onProgress - (done, total) 進捗コールバック
+ * @returns {Promise<Array<{lat,lng}|null>>} 元の順番で座標配列を返す
+ */
+function geocodeAddresses(addresses, onProgress) {
+  return new Promise((resolve) => {
+    const geocoder = new google.maps.Geocoder();
+    const results = new Array(addresses.length).fill(null);
+    let completed = 0;
+
+    function geocodeOne(i) {
+      if (i >= addresses.length) return;
+      const addr = addresses[i];
+      if (!addr) {
+        completed++;
+        if (onProgress) onProgress(completed, addresses.length);
+        if (completed === addresses.length) resolve(results);
+        geocodeOne(i + 1);
+        return;
+      }
+      geocoder.geocode({ address: addr }, (res, status) => {
+        if (status === 'OK') {
+          results[i] = {
+            lat: res[0].geometry.location.lat(),
+            lng: res[0].geometry.location.lng()
+          };
+          completed++;
+          if (onProgress) onProgress(completed, addresses.length);
+          if (completed === addresses.length) resolve(results);
+          setTimeout(() => geocodeOne(i + 1), 100); // 100ms間隔でリクエスト
+        } else if (status === 'OVER_QUERY_LIMIT') {
+          // レート制限 → 1秒待ってリトライ
+          setTimeout(() => geocodeOne(i), 1000);
+        } else {
+          // その他エラー → スキップ
+          completed++;
+          if (onProgress) onProgress(completed, addresses.length);
+          if (completed === addresses.length) resolve(results);
+          setTimeout(() => geocodeOne(i + 1), 100);
+        }
+      });
+    }
+    geocodeOne(0);
+  });
+}
+
 // デポの正しい座標（住所から確認済み）
 const DEPOT_CORRECT_COORDS = {
   '兵庫県神戸市西区見津が丘7丁目1-3': { lat: 34.7309, lng: 135.0867 },
@@ -604,53 +655,43 @@ function loadCSV(file) {
       locations = []; orderedLocations = []; assignments = {}; currentDeliveryId = null;
 
       const shops = Array.from(shopMap.values());
-      document.getElementById('status').textContent = `${shops.length}件を地図に配置中...`;
+      document.getElementById('status').textContent = `${shops.length}件を地図に配置中... (0/${shops.length})`;
 
-      const geocoder = new google.maps.Geocoder();
-      let processed = 0;
-      // Geocoding結果を元の順番で保持するための配列
-      const geocodeResults = new Array(shops.length).fill(null);
-
-      shops.forEach((shop, i) => {
-        geocoder.geocode({ address: shop.addr }, (results, status) => {
-          processed++;
-          if (status === 'OK') {
-            geocodeResults[i] = {
-              name: shop.name, addr: shop.addr,
-              lat: results[0].geometry.location.lat(),
-              lng: results[0].geometry.location.lng(),
-              items: shop.items, vol: parseFloat(shop.vol.toFixed(3))
-            };
-          }
-          if (processed === shops.length) {
-            // 全件完了後、元の順番でlocationsに追加してマーカーを一括描画
-            markers.forEach(m => m.setMap(null)); markers = [];
-            geocodeResults.forEach((loc, idx) => {
-              if (!loc) return;
-              locations.push(loc);
-              const markerIdx = locations.length - 1;
-              const marker = new google.maps.Marker({
-                position: { lat: loc.lat, lng: loc.lng }, map, title: loc.name,
-                label: { text: String(markerIdx+1), color: 'white', fontSize: '11px', fontWeight: 'bold' }
-              });
-              marker.addListener('click', () => new google.maps.InfoWindow({
-                content: `<div style="font-size:13px;"><b>${loc.name}</b><br><span style="color:#666;font-size:12px;">${loc.addr}</span><br><span style="font-size:12px;">個数: ${loc.items}個 / ${loc.vol.toFixed(2)}才</span></div>`
-              }).open(map, marker));
-              markers.push(marker);
-            });
-            document.getElementById('status').textContent = `${locations.length}件を表示しました（CSV読み込み）`;
-            updateSidebar(locations, false);
-            renderDriverSidebar();
-            renderRightSidebar();
-            saveLocationsToSession();
-            if (locations.length > 0) {
-              const bounds = new google.maps.LatLngBounds();
-              bounds.extend({ lat: DEPOT.lat, lng: DEPOT.lng });
-              locations.forEach(l => bounds.extend({ lat: l.lat, lng: l.lng }));
-              map.fitBounds(bounds);
-            }
-          }
+      const addresses = shops.map(s => s.addr);
+      geocodeAddresses(addresses, (done, total) => {
+        document.getElementById('status').textContent = `地図に配置中... (${done}/${total})`;
+      }).then(coords => {
+        markers.forEach(m => m.setMap(null)); markers = [];
+        shops.forEach((shop, i) => {
+          const c = coords[i];
+          if (!c) return; // Geocoding失敗はスキップ
+          const loc = {
+            name: shop.name, addr: shop.addr,
+            lat: c.lat, lng: c.lng,
+            items: shop.items, vol: parseFloat(shop.vol.toFixed(3))
+          };
+          locations.push(loc);
+          const markerIdx = locations.length - 1;
+          const marker = new google.maps.Marker({
+            position: { lat: c.lat, lng: c.lng }, map, title: shop.name,
+            label: { text: String(markerIdx+1), color: 'white', fontSize: '11px', fontWeight: 'bold' }
+          });
+          marker.addListener('click', () => new google.maps.InfoWindow({
+            content: `<div style="font-size:13px;"><b>${shop.name}</b><br><span style="color:#666;font-size:12px;">${shop.addr}</span><br><span style="font-size:12px;">個数: ${shop.items}個 / ${shop.vol.toFixed(2)}才</span></div>`
+          }).open(map, marker));
+          markers.push(marker);
         });
+        document.getElementById('status').textContent = `${locations.length}件を表示しました（CSV読み込み）`;
+        updateSidebar(locations, false);
+        renderDriverSidebar();
+        renderRightSidebar();
+        saveLocationsToSession();
+        if (locations.length > 0) {
+          const bounds = new google.maps.LatLngBounds();
+          bounds.extend({ lat: DEPOT.lat, lng: DEPOT.lng });
+          locations.forEach(l => bounds.extend({ lat: l.lat, lng: l.lng }));
+          map.fitBounds(bounds);
+        }
       });
 
     } catch(err) {
@@ -687,25 +728,44 @@ function loadExcel(event) {
       if (routeLine) { routeLine.setMap(null); routeLine = null; }
       locations = []; orderedLocations = []; assignments = {}; currentDeliveryId = null;
       document.getElementById('status').textContent = `${rows.length}件を地図に配置中...`;
-      const geocoder = new google.maps.Geocoder();
-      let processed = 0;
-      // Geocoding結果を元の順番で保持
-      const geocodeResults = new Array(rows.length).fill(null);
-      rows.forEach((row, i) => {
-        const addr  = row[addrKey];
-        const name  = nameKey ? row[nameKey] : `配送先${i+1}`;
-        const items = itemKey ? rowsRaw[i][itemKey] : null;
-        const vol   = volKey  ? rowsRaw[i][volKey]  : null;
-        if (!addr) { processed++; checkDone(processed, rows.length, geocodeResults); return; }
-        geocoder.geocode({ address: String(addr) }, (results, status) => {
-          processed++;
-          if (status === 'OK') {
-            geocodeResults[i] = { name: String(name), addr: String(addr),
-              lat: results[0].geometry.location.lat(),
-              lng: results[0].geometry.location.lng(), items, vol };
-          }
-          checkDone(processed, rows.length, geocodeResults);
+      const rowData = rows.map((row, i) => ({
+        name:  String(nameKey ? row[nameKey] : `配送先${i+1}`),
+        addr:  row[addrKey] ? String(row[addrKey]) : null,
+        items: itemKey ? rowsRaw[i][itemKey] : null,
+        vol:   volKey  ? rowsRaw[i][volKey]  : null
+      }));
+      const addresses = rowData.map(r => r.addr);
+      document.getElementById('status').textContent = `${addresses.filter(Boolean).length}件を地図に配置中... (0/${addresses.filter(Boolean).length})`;
+      geocodeAddresses(addresses, (done, total) => {
+        document.getElementById('status').textContent = `地図に配置中... (${done}/${total})`;
+      }).then(coords => {
+        markers.forEach(m => m.setMap(null)); markers = [];
+        rowData.forEach((row, i) => {
+          const c = coords[i];
+          if (!c || !row.addr) return;
+          const loc = { name: row.name, addr: row.addr, lat: c.lat, lng: c.lng, items: row.items, vol: row.vol };
+          locations.push(loc);
+          const markerIdx = locations.length - 1;
+          const marker = new google.maps.Marker({
+            position: { lat: c.lat, lng: c.lng }, map, title: row.name,
+            label: { text: String(markerIdx+1), color: 'white', fontSize: '11px', fontWeight: 'bold' }
+          });
+          marker.addListener('click', () => new google.maps.InfoWindow({
+            content: `<div style="font-size:13px;"><b>${row.name}</b><br><span style="color:#666;font-size:12px;">${row.addr}</span>${row.items?`<br><span style="font-size:12px;">個数: ${row.items}個</span>`:''}${row.vol?`<span style="font-size:12px;"> / ${row.vol}才</span>`:''}</div>`
+          }).open(map, marker));
+          markers.push(marker);
         });
+        document.getElementById('status').textContent = `${locations.length}件を表示しました`;
+        updateSidebar(locations, false);
+        renderDriverSidebar();
+        renderRightSidebar();
+        saveLocationsToSession();
+        if (locations.length > 0) {
+          const bounds = new google.maps.LatLngBounds();
+          bounds.extend({ lat: DEPOT.lat, lng: DEPOT.lng });
+          locations.forEach(l => bounds.extend({ lat: l.lat, lng: l.lng }));
+          map.fitBounds(bounds);
+        }
       });
     } catch(err) { document.getElementById('status').textContent = 'エラー: ' + err.message; }
   };
@@ -713,33 +773,9 @@ function loadExcel(event) {
 }
 
 function checkDone(processed, total, geocodeResults) {
+  // 旧来の互換用。新しいコードはgeocodeAddresses()を使うためここは空処理
   if (processed === total) {
-    // 全件完了後、元の順番でlocationsに追加してマーカーを一括描画
-    markers.forEach(m => m.setMap(null)); markers = [];
-    (geocodeResults || []).forEach((loc, idx) => {
-      if (!loc) return;
-      locations.push(loc);
-      const markerIdx = locations.length - 1;
-      const marker = new google.maps.Marker({
-        position: { lat: loc.lat, lng: loc.lng }, map, title: loc.name,
-        label: { text: String(markerIdx+1), color: 'white', fontSize: '11px', fontWeight: 'bold' }
-      });
-      marker.addListener('click', () => new google.maps.InfoWindow({
-        content: `<div style="font-size:13px;"><b>${loc.name}</b><br><span style="color:#666;font-size:12px;">${loc.addr}</span>${loc.items?`<br><span style="font-size:12px;">個数: ${loc.items}個</span>`:''}${loc.vol?`<span style="font-size:12px;"> / ${loc.vol}才</span>`:''}</div>`
-      }).open(map, marker));
-      markers.push(marker);
-    });
-    document.getElementById('status').textContent = `${locations.length}件を表示しました`;
-    updateSidebar(locations, false);
-    renderDriverSidebar();
-    renderRightSidebar();
-    if (locations.length > 0) {
-      const bounds = new google.maps.LatLngBounds();
-      bounds.extend({ lat: DEPOT.lat, lng: DEPOT.lng });
-      locations.forEach(l => bounds.extend({ lat: l.lat, lng: l.lng }));
-      map.fitBounds(bounds);
-    }
-    saveLocationsToSession();
+    console.log('checkDone called (legacy)');
   }
 }
 
@@ -1594,21 +1630,44 @@ function processExcelData(rows, rowsRaw) {
   if (routeLine) { routeLine.setMap(null); routeLine=null; }
   locations=[]; orderedLocations=[]; assignments={}; currentDeliveryId=null;
   document.getElementById('status').textContent = `${rows.length}件を地図に配置中...`;
-  const geocoder = new google.maps.Geocoder();
-  let processed = 0;
-  const geocodeResults = new Array(rows.length).fill(null);
-  rows.forEach((row,i)=>{
-    const addr=row[addrKey]; const name=nameKey?row[nameKey]:`配送先${i+1}`;
-    const items=itemKey?rowsRaw[i][itemKey]:null; const vol=volKey?rowsRaw[i][volKey]:null;
-    if (!addr){processed++;checkDone(processed,rows.length,geocodeResults);return;}
-    geocoder.geocode({address:String(addr)},(results,status)=>{
-      processed++;
-      if (status==='OK'){
-        geocodeResults[i]={name:String(name),addr:String(addr),
-          lat:results[0].geometry.location.lat(),lng:results[0].geometry.location.lng(),items,vol};
-      }
-      checkDone(processed,rows.length,geocodeResults);
+  const rowData = rows.map((row,i)=>({
+    name: String(nameKey?row[nameKey]:`配送先${i+1}`),
+    addr: row[addrKey]?String(row[addrKey]):null,
+    items: itemKey?rowsRaw[i][itemKey]:null,
+    vol: volKey?rowsRaw[i][volKey]:null
+  }));
+  const addresses = rowData.map(r=>r.addr);
+  document.getElementById('status').textContent = `地図に配置中... (0/${addresses.filter(Boolean).length})`;
+  geocodeAddresses(addresses,(done,total)=>{
+    document.getElementById('status').textContent = `地図に配置中... (${done}/${total})`;
+  }).then(coords=>{
+    markers.forEach(m=>m.setMap(null)); markers=[];
+    rowData.forEach((row,i)=>{
+      const c=coords[i];
+      if(!c||!row.addr)return;
+      const loc={name:row.name,addr:row.addr,lat:c.lat,lng:c.lng,items:row.items,vol:row.vol};
+      locations.push(loc);
+      const markerIdx=locations.length-1;
+      const marker=new google.maps.Marker({
+        position:{lat:c.lat,lng:c.lng},map,title:row.name,
+        label:{text:String(markerIdx+1),color:'white',fontSize:'11px',fontWeight:'bold'}
+      });
+      marker.addListener('click',()=>new google.maps.InfoWindow({
+        content:`<div style="font-size:13px;"><b>${row.name}</b><br><span style="color:#666;font-size:12px;">${row.addr}</span>${row.items?`<br><span style="font-size:12px;">個数: ${row.items}個</span>`:''}${row.vol?`<span style="font-size:12px;"> / ${row.vol}才</span>`:''}</div>`
+      }).open(map,marker));
+      markers.push(marker);
     });
+    document.getElementById('status').textContent=`${locations.length}件を表示しました`;
+    updateSidebar(locations,false);
+    renderDriverSidebar();
+    renderRightSidebar();
+    saveLocationsToSession();
+    if(locations.length>0){
+      const bounds=new google.maps.LatLngBounds();
+      bounds.extend({lat:DEPOT.lat,lng:DEPOT.lng});
+      locations.forEach(l=>bounds.extend({lat:l.lat,lng:l.lng}));
+      map.fitBounds(bounds);
+    }
   });
 }
 </script>
