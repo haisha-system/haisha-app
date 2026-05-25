@@ -1700,8 +1700,12 @@ function loadPendingFile() {
   const fileName = sessionStorage.getItem('pendingFileName');
   const fileDataStr = sessionStorage.getItem('pendingFileData');
   if (!fileName || !fileDataStr) return;
+  // メニューから渡された追加モードフラグを取得
+  const appendMode = sessionStorage.getItem('pendingAppendMode') === '1';
   sessionStorage.removeItem('pendingFileName');
   sessionStorage.removeItem('pendingFileData');
+  sessionStorage.removeItem('pendingAppendMode');
+  window._appendMode = appendMode;
   try {
     const arr = JSON.parse(fileDataStr);
     const uint8 = new Uint8Array(arr);

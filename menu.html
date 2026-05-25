@@ -411,12 +411,63 @@
 function handleFileSelect(event) {
   const file = event.target.files[0];
   if (!file) return;
-  // ファイルをsessionStorageに一時保存してindex.htmlに渡す
+  event.target.value = '';
+
+  const locs = sessionStorage.getItem('haisha_locations');
+  const hasData = locs && JSON.parse(locs).length > 0;
+
+  if (hasData) {
+    // データがある場合はダイアログを表示
+    let count = 0;
+    try { count = JSON.parse(locs).length; } catch(e) {}
+    showMenuLoadDialog(file, count);
+  } else {
+    doMenuFileLoad(file, false);
+  }
+}
+
+function showMenuLoadDialog(file, count) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = `
+    <div style="background:#1a2535;border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:28px 32px;max-width:420px;width:90%;text-align:center;">
+      <div style="font-size:28px;margin-bottom:12px;">📂</div>
+      <div style="font-size:15px;font-weight:700;color:white;margin-bottom:8px;">データの読み込み方法</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-bottom:20px;">
+        現在 <span style="color:#f59e0b;font-weight:700;">${count}件</span> のデータがあります。<br>
+        「<strong style="color:white;">${file.name}</strong>」をどのように読み込みますか？
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button id="menu-append-btn"
+          style="padding:12px;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.4);color:#10b981;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;">
+          ➕ 追加読み込み<br>
+          <span style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.4);">既存の配車はそのまま・新しい届け先だけ追加</span>
+        </button>
+        <button id="menu-overwrite-btn"
+          style="padding:12px;background:rgba(59,130,246,0.2);border:1px solid rgba(59,130,246,0.4);color:#93c5fd;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;">
+          🔄 上書き読み込み<br>
+          <span style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.4);">現在のデータをクリアして最初から</span>
+        </button>
+        <button id="menu-cancel-btn"
+          style="padding:8px;background:transparent;border:none;color:rgba(255,255,255,0.3);cursor:pointer;font-size:12px;font-family:inherit;">
+          キャンセル
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  document.getElementById('menu-append-btn').onclick = () => { document.body.removeChild(overlay); doMenuFileLoad(file, true); };
+  document.getElementById('menu-overwrite-btn').onclick = () => { document.body.removeChild(overlay); doMenuFileLoad(file, false); };
+  document.getElementById('menu-cancel-btn').onclick = () => { document.body.removeChild(overlay); };
+}
+
+function doMenuFileLoad(file, appendMode) {
   const reader = new FileReader();
   reader.onload = function(e) {
     try {
       sessionStorage.setItem('pendingFileName', file.name);
       sessionStorage.setItem('pendingFileData', JSON.stringify(Array.from(new Uint8Array(e.target.result))));
+      sessionStorage.setItem('pendingAppendMode', appendMode ? '1' : '0');
       location.href = 'index.html';
     } catch(err) {
       alert('ファイルが大きすぎます。配車画面から直接読み込んでください。');
