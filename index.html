@@ -103,12 +103,21 @@
     .depot-label { font-size: 11px; color: #a78bfa; font-weight: bold; margin-bottom: 2px; }
     .depot-name  { font-weight: 500; color: rgba(255,255,255,0.9); font-size: 12px; }
     .depot-addr  { color: rgba(255,255,255,0.4); font-size: 11px; margin-top: 2px; }
-    .depot-filter-btn {
-      padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2);
-      background: transparent; color: rgba(255,255,255,0.5); font-size: 10px;
-      cursor: pointer; font-family: inherit; white-space: nowrap;
+    .depot-select-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 8px; border-radius: 6px; cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03);
+      transition: all 0.15s;
     }
-    .depot-filter-btn.active { background: #3b82f6; color: white; border-color: #3b82f6; font-weight: 700; }
+    .depot-select-item:hover { border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.07); }
+    .depot-select-item.active { border-color: #3b82f6; background: rgba(59,130,246,0.15); }
+    .depot-select-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+      border: 2px solid rgba(255,255,255,0.3);
+    }
+    .depot-select-item.active .depot-select-dot { background: #3b82f6; border-color: #3b82f6; }
+    .depot-select-name { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.7); }
+    .depot-select-item.active .depot-select-name { color: white; }
 
     /* ドライバーカード（サイドバー） */
     .driver-sb-card {
@@ -242,11 +251,9 @@
 <div id="main">
   <!-- 左サイドバー：ドライバー一覧 -->
   <div id="sidebar-left">
-    <div class="depot-card" style="cursor:default;">
+    <div class="depot-card" style="cursor:default;padding-bottom:6px;">
       <div class="depot-label">🏭 出発地</div>
-      <div class="depot-name" id="depot-display-name">メープルツリー神戸ロジスティクスセンター</div>
-      <div class="depot-addr" id="depot-display-addr">兵庫県神戸市西区見津が丘7丁目1-3</div>
-      <div id="depot-filter-btns" style="display:none;margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;"></div>
+      <div id="depot-selector" style="margin-top:6px;display:flex;flex-direction:column;gap:4px;"></div>
     </div>
     <div style="font-size:11px;letter-spacing:0.1em;color:#3b82f6;font-weight:700;margin-bottom:8px;text-transform:uppercase;">本日稼働ドライバー</div>
     <div id="driver-list-sidebar" style="flex:1;"></div>
@@ -417,8 +424,9 @@ function setDepotByCode(csvCode) {
   const useAddr = depot.departAddr || depot.loadAddr;
 
   // デポ情報をサイドバーに反映
-  const nameEl = document.getElementById('depot-display-name') || document.querySelector('.depot-name');
-  const addrEl = document.getElementById('depot-display-addr') || document.querySelector('.depot-addr');
+  // depot-selectorがある場合はそちらで管理するのでスキップ
+  const nameEl = document.querySelector('.depot-name');
+  const addrEl = document.querySelector('.depot-addr');
   if (nameEl) nameEl.textContent = depot.name;
   if (addrEl) addrEl.textContent = useAddr;
 
@@ -988,61 +996,82 @@ function renderDriverTab() {
 }
 
 // ===== サイドバー =====
-// デポフィルターボタンを更新
+// デポ選択UIを更新
+let selectedDepotCodes = new Set(); // 選択中のデポコード（空=全表示）
+
 function renderDepotFilterBtns() {
-  const container = document.getElementById('depot-filter-btns');
+  const container = document.getElementById('depot-selector');
   if (!container) return;
 
-  // 読み込まれているデポコードを収集
   const depotCodes = [...new Set(locations.map(l => l.depotCode).filter(Boolean))];
-  if (depotCodes.length <= 1) {
-    container.style.display = 'none';
-    return;
-  }
-  container.style.display = 'flex';
-
-  const depots = window._depots || [];
-  const btns = [{ code: null, label: '全表示' }, ...depotCodes.map(code => {
-    const depot = depots.find(d => d.csvCode === code);
-    return { code, label: depot ? depot.name : code };
-  })];
+  const depotList = window._depots || [];
 
   container.innerHTML = '';
-  btns.forEach(({ code, label }) => {
-    const btn = document.createElement('button');
-    btn.className = 'depot-filter-btn' + (activeDepotFilter === code ? ' active' : '');
-    btn.textContent = label;
-    btn.onclick = () => setDepotFilter(code);
-    container.appendChild(btn);
+
+  if (depotCodes.length === 0) {
+    // デポコードなし：シンプル表示
+    const item = document.createElement('div');
+    item.className = 'depot-select-item active';
+    item.innerHTML = `<div class="depot-select-dot"></div><div class="depot-select-name" id="depot-display-name">神戸西デポ</div>`;
+    container.appendChild(item);
+    return;
+  }
+
+  // デポコードがある場合：選択カードを表示
+  depotCodes.forEach(code => {
+    const depot = depotList.find(d => d.csvCode === code);
+    const label = depot ? depot.name : code;
+    const isActive = selectedDepotCodes.size === 0 || selectedDepotCodes.has(code);
+
+    const item = document.createElement('div');
+    item.className = 'depot-select-item' + (isActive ? ' active' : '');
+    item.innerHTML = `<div class="depot-select-dot"></div><div class="depot-select-name">${label}</div>`;
+    item.onclick = () => toggleDepotFilter(code);
+    container.appendChild(item);
   });
 }
 
-function setDepotFilter(code) {
-  activeDepotFilter = code;
+function toggleDepotFilter(code) {
+  if (selectedDepotCodes.has(code)) {
+    selectedDepotCodes.delete(code);
+    // 全部外れたら全表示に戻す
+    if (selectedDepotCodes.size === 0) {
+      selectedDepotCodes = new Set();
+    }
+  } else {
+    selectedDepotCodes.add(code);
+  }
+  applyDepotFilter();
+}
+
+function applyDepotFilter() {
   renderDepotFilterBtns();
 
-  // デポを切り替え
-  if (code === null) {
-    // 全表示：最初のデポに戻す
+  // 表示する配送先を決定
+  const filtered = selectedDepotCodes.size === 0
+    ? locations
+    : locations.filter(l => selectedDepotCodes.has(l.depotCode));
+
+  // デポマーカーを切り替え（単一選択時はそのデポ、複数/全表示は最初のデポ）
+  if (selectedDepotCodes.size === 1) {
+    setDepotByCode([...selectedDepotCodes][0]);
+  } else {
     const firstCode = locations.find(l => l.depotCode)?.depotCode;
     if (firstCode) setDepotByCode(firstCode);
-  } else {
-    setDepotByCode(code);
   }
 
-  // 地図のマーカーを再描画
-  const filtered = code === null ? locations : locations.filter(l => l.depotCode === code);
+  // マーカー再描画
   markers.forEach(m => m.setMap(null)); markers = [];
   clearRouteLines(); orderedLocations = [];
 
-  filtered.forEach((loc) => {
+  filtered.forEach((loc, idx) => {
     const locIdx = locations.indexOf(loc);
     const asgn = assignments[locIdx];
     const driverIdx = asgn ? drivers.findIndex(d => d.id === asgn.driverId) : -1;
     const fillColor = driverIdx >= 0 ? DRIVER_COLORS[driverIdx % DRIVER_COLORS.length] : '#e74c3c';
     const marker = new google.maps.Marker({
       position: { lat: loc.lat, lng: loc.lng }, map, title: loc.name,
-      label: { text: String(filtered.indexOf(loc)+1), color: 'white', fontSize: '11px', fontWeight: 'bold' },
+      label: { text: String(idx+1), color: 'white', fontSize: '11px', fontWeight: 'bold' },
       icon: { path: google.maps.SymbolPath.CIRCLE, scale: 14, fillColor, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 }
     });
     marker.addListener('click', () => new google.maps.InfoWindow({
@@ -1051,7 +1080,6 @@ function setDepotFilter(code) {
     markers.push(marker);
   });
 
-  // 地図範囲を調整
   if (filtered.length > 0) {
     const bounds = new google.maps.LatLngBounds();
     bounds.extend({ lat: DEPOT.lat, lng: DEPOT.lng });
@@ -1059,12 +1087,19 @@ function setDepotFilter(code) {
     map.fitBounds(bounds);
   }
 
-  // サイドバー更新
   updateSidebar(filtered, false);
   renderDriverSidebar();
   renderRightSidebarFiltered(filtered);
-  document.getElementById('status').textContent =
-    code === null ? `全${locations.length}件表示` : `${filtered.length}件表示（${document.querySelector('.depot-filter-btn.active')?.textContent||code}）`;
+
+  const label = selectedDepotCodes.size === 0 ? `全${locations.length}件表示`
+    : `${filtered.length}件表示`;
+  document.getElementById('status').textContent = label;
+}
+
+function setDepotFilter(code) {
+  // 後方互換用
+  selectedDepotCodes = code === null ? new Set() : new Set([code]);
+  applyDepotFilter();
 }
 
 function renderRightSidebarFiltered(filtered) {
