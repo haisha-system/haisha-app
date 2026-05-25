@@ -202,6 +202,12 @@ let currentId = null;
 let editMap = null, editMarker = null;
 let isNew = false;
 
+// 既知の正しい座標（住所から確認済み）
+const KNOWN_COORDS = {
+  '兵庫県神戸市西区見津が丘7丁目1-3': { lat: 34.7309, lng: 135.0867 },
+  '兵庫県丹波市氷上町氷上10':         { lat: 35.1167, lng: 135.0167 }
+};
+
 const TYPE_ORDER = { main:0, sub:1, own:2, carrier:3 };
 const TYPE_LABEL = { main:'メインデポ', sub:'サブデポ', own:'自社', carrier:'運送会社' };
 const TYPE_CLASS = { main:'badge-main', sub:'badge-sub', own:'badge-own', carrier:'badge-carrier' };
@@ -222,6 +228,17 @@ function loadData() {
     mappings = { '2806':1, '2805':2 };
     saveData();
   }
+  // 既知住所の古い座標を自動修正
+  let needsSave = false;
+  depots.forEach(d => {
+    const known = (typeof KNOWN_COORDS !== 'undefined') ? KNOWN_COORDS[d.addr||''] : null;
+    if (known) {
+      if (Math.abs((d.lat||0)-known.lat)>0.01 || Math.abs((d.lng||0)-known.lng)>0.01) {
+        d.lat = known.lat; d.lng = known.lng; needsSave = true;
+      }
+    }
+  });
+  if (needsSave) saveData();
 }
 
 function saveData() {
@@ -267,6 +284,31 @@ function renderList() {
 function selectDepot(id) {
   currentId = id;
   isNew = false;
+  // 古い座標が入っている場合は自動修正
+  const d = depots.find(x => x.id === id);
+  if (d) {
+    const addr = d.addr || '';
+    const known = KNOWN_COORDS[addr];
+    if (known) {
+      const latOk = Math.abs((d.lat||0) - known.lat) < 0.01;
+      const lngOk = Math.abs((d.lng||0) - known.lng) < 0.01;
+      if (!latOk || !lngOk) {
+        d.lat = known.lat;
+        d.lng = known.lng;
+        saveData();
+      }
+    } else if (d.addr && (!d.lat || !d.lng)) {
+      // 座標未設定の場合はGeocodingで自動取得
+      new google.maps.Geocoder().geocode({ address: d.addr }, (res, status) => {
+        if (status === 'OK') {
+          d.lat = res[0].geometry.location.lat();
+          d.lng = res[0].geometry.location.lng();
+          saveData();
+          renderEditPanel(id);
+        }
+      });
+    }
+  }
   renderList();
   renderEditPanel(id);
 }
