@@ -546,11 +546,57 @@ function initMap() {
 function loadFile(event) {
   const file = event.target.files[0];
   if (!file) return;
+  // データが既にある場合は追加/上書きを選択
+  if (locations.length > 0) {
+    showLoadModeDialog(file);
+  } else {
+    doLoadFile(file, false);
+  }
+  // inputをリセット（同じファイルを再選択できるように）
+  event.target.value = '';
+}
+
+// 追加/上書き選択ダイアログ
+function showLoadModeDialog(file) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = `
+    <div style="background:#1a2535;border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:28px 32px;max-width:400px;width:90%;text-align:center;">
+      <div style="font-size:28px;margin-bottom:12px;">📂</div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:8px;">データの読み込み方法</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-bottom:20px;">
+        現在 <span style="color:#f59e0b;font-weight:700;">${locations.length}件</span> のデータが読み込まれています。<br>
+        「<strong>${file.name}</strong>」をどのように読み込みますか？
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button onclick="doLoadFile(window._pendingFile, true);document.body.removeChild(this.closest('[style*=fixed]'))"
+          style="padding:12px;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.4);color:#10b981;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;">
+          ➕ 追加読み込み<br>
+          <span style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.4);">既存の配車はそのまま・新しい届け先だけ追加</span>
+        </button>
+        <button onclick="doLoadFile(window._pendingFile, false);document.body.removeChild(this.closest('[style*=fixed]'))"
+          style="padding:12px;background:rgba(59,130,246,0.2);border:1px solid rgba(59,130,246,0.4);color:#93c5fd;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;">
+          🔄 上書き読み込み<br>
+          <span style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.4);">現在のデータをクリアして最初から</span>
+        </button>
+        <button onclick="document.body.removeChild(this.closest('[style*=fixed]'))"
+          style="padding:8px;background:transparent;border:none;color:rgba(255,255,255,0.3);cursor:pointer;font-size:12px;font-family:inherit;">
+          キャンセル
+        </button>
+      </div>
+    </div>
+  `;
+  window._pendingFile = file;
+  document.body.appendChild(overlay);
+}
+
+function doLoadFile(file, appendMode) {
+  window._appendMode = appendMode;
   const ext = file.name.split('.').pop().toLowerCase();
   if (ext === 'csv') {
     loadCSV(file);
   } else {
-    loadExcel(event);
+    loadExcel({ target: { files: [file] } });
   }
 }
 
@@ -650,13 +696,33 @@ function loadCSV(file) {
       if (csvCodes.length > 0) setDepotByCode(csvCodes[0]);
 
       // 地図にプロット
-      markers.forEach(m => m.setMap(null)); markers = [];
-      if (routeLine) { routeLine.setMap(null); routeLine = null; }
-      locations = []; orderedLocations = []; assignments = {}; currentDeliveryId = null;
+      const appendMode = window._appendMode === true;
+      window._appendMode = false;
+
+      if (!appendMode) {
+        // 上書きモード：全クリア
+        markers.forEach(m => m.setMap(null)); markers = [];
+        if (routeLine) { routeLine.setMap(null); routeLine = null; }
+        clearRouteLines();
+        locations = []; orderedLocations = []; assignments = {}; currentDeliveryId = null;
+      }
 
       // 届け先コードをshopに保存しておく
       const shopEntries = Array.from(shopMap.entries()); // [code, shop]
-      const shops = shopEntries.map(([code, shop]) => ({ ...shop, code }));
+      // 追加モードの場合、既存の届け先コードはスキップ
+      const existingCodes = new Set(locations.map(l => l.code).filter(Boolean));
+      const allShops = shopEntries.map(([code, shop]) => ({ ...shop, code }));
+      const shops = appendMode
+        ? allShops.filter(s => !existingCodes.has(s.code))
+        : allShops;
+
+      if (appendMode && shops.length === 0) {
+        document.getElementById('status').textContent = '追加する新しい配送先はありませんでした（全件重複）';
+        return;
+      }
+      if (appendMode) {
+        document.getElementById('status').textContent = `${shops.length}件を追加します...`;
+      }
 
       // 店舗管理から保存済み座標を読み込む
       let savedStores = {};
@@ -696,7 +762,9 @@ function loadCSV(file) {
         });
         try { localStorage.setItem('haisha_stores', JSON.stringify(savedStores)); } catch(e) {}
 
-        markers.forEach(m => m.setMap(null)); markers = [];
+        if (!appendMode) {
+          markers.forEach(m => m.setMap(null)); markers = [];
+        }
         shops.forEach((shop, i) => {
           const saved = savedStores[shop.code];
           // 優先順位：①手動修正座標 ②Geocoding結果 ③スキップ
@@ -721,7 +789,8 @@ function loadCSV(file) {
           }).open(map, marker));
           markers.push(marker);
         });
-        document.getElementById('status').textContent = `${locations.length}件を表示しました（CSV読み込み）`;
+        const modeLabel = appendMode ? `追加読み込み（+${shops.length}件）` : 'CSV読み込み';
+        document.getElementById('status').textContent = `${locations.length}件を表示しました（${modeLabel}）`;
         updateSidebar(locations, false);
         renderDriverSidebar();
         renderRightSidebar();

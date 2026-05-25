@@ -351,6 +351,13 @@
       <div class="accent-line" style="background:#e67e22;"></div>
     </div>
 
+    <div class="sub-card" onclick="clearAllData()" style="cursor:pointer;">
+      <span class="sub-card-icon">🗑</span>
+      <h3>データをクリア</h3>
+      <p>読み込んだ配車データをすべて削除します。ドライバー・店舗情報は残ります。</p>
+      <div class="accent-line" style="background:#ef4444;"></div>
+    </div>
+
     <div class="sub-card disabled">
       <span class="coming-soon">近日公開</span>
       <span class="sub-card-icon">🚗</span>
@@ -417,6 +424,26 @@ function handleFileSelect(event) {
     }
   };
   reader.readAsArrayBuffer(file);
+}
+
+function clearAllData() {
+  const locs = sessionStorage.getItem('haisha_locations');
+  if (!locs) { alert('クリアするデータがありません。'); return; }
+  try {
+    const arr = JSON.parse(locs);
+    if (!confirm(`配車データ（${arr.length}件）をクリアしますか？
+ドライバー・店舗情報は削除されません。`)) return;
+  } catch(e) {}
+  sessionStorage.removeItem('haisha_locations');
+  sessionStorage.removeItem('haisha_assignments');
+  sessionStorage.removeItem('haisha_currentDate');
+  sessionStorage.removeItem('haisha_depot');
+  sessionStorage.removeItem('lastExcelData');
+  sessionStorage.removeItem('pendingFileName');
+  sessionStorage.removeItem('pendingFileData');
+  const el = document.getElementById('map-card-status');
+  if (el) el.innerHTML = '地図・ルート表示・配車割り当て画面を開きます。<br><span style="color:rgba(255,255,255,0.4);font-size:12px;">（先にデータを読み込んでください）</span>';
+  alert('配車データをクリアしました。');
 }
 
 function exportExcelFromMenu() {
