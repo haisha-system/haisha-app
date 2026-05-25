@@ -686,20 +686,20 @@ function loadCSV(file) {
         currentDate = todayStr();
       }
 
-      // 拠点コードでデポを自動切り替え
-      const csvCodes = [...new Set(rows.map(line => {
-        if (!line.trim()) return null;
-        const cols = parseCSVLine(line);
-        const codeIdx2 = headers.findIndex(h => h.includes('配送拠点コード'));
-        return codeIdx2 >= 0 ? cols[codeIdx2] : null;
-      }).filter(Boolean))];
-      if (csvCodes.length > 0) setDepotByCode(csvCodes[0]);
-
       // 地図にプロット
       const appendMode = window._appendMode === true;
       window._appendMode = false;
 
+      // 拠点コードでデポを自動切り替え（追加モードの場合はスキップ）
       if (!appendMode) {
+        const csvCodes = [...new Set(rows.map(line => {
+          if (!line.trim()) return null;
+          const cols = parseCSVLine(line);
+          const codeIdx2 = headers.findIndex(h => h.includes('配送拠点コード'));
+          return codeIdx2 >= 0 ? cols[codeIdx2] : null;
+        }).filter(Boolean))];
+        if (csvCodes.length > 0) setDepotByCode(csvCodes[0]);
+
         // 上書きモード：全クリア
         markers.forEach(m => m.setMap(null)); markers = [];
         if (routeLine) { routeLine.setMap(null); routeLine = null; }
