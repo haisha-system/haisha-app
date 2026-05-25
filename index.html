@@ -322,41 +322,41 @@ function geocodeAddresses(addresses, onProgress) {
   return new Promise((resolve) => {
     const geocoder = new google.maps.Geocoder();
     const results = new Array(addresses.length).fill(null);
-    let completed = 0;
+    // nullアドレスは即完了扱い
+    const targets = addresses.map((addr, i) => ({ addr, i })).filter(({addr}) => addr);
+    if (targets.length === 0) { resolve(results); return; }
 
-    function geocodeOne(i) {
-      if (i >= addresses.length) return;
-      const addr = addresses[i];
-      if (!addr) {
-        completed++;
-        if (onProgress) onProgress(completed, addresses.length);
-        if (completed === addresses.length) resolve(results);
-        geocodeOne(i + 1);
-        return;
-      }
+    let completed = 0;
+    let nextIdx = 0;
+    const CONCURRENCY = 5; // 同時リクエスト数
+    const total = targets.length;
+
+    function done(i, result) {
+      results[i] = result;
+      completed++;
+      if (onProgress) onProgress(completed, total);
+      if (completed === total) { resolve(results); return; }
+      if (nextIdx < targets.length) launch();
+    }
+
+    function launch() {
+      if (nextIdx >= targets.length) return;
+      const { addr, i } = targets[nextIdx++];
       geocoder.geocode({ address: addr }, (res, status) => {
         if (status === 'OK') {
-          results[i] = {
-            lat: res[0].geometry.location.lat(),
-            lng: res[0].geometry.location.lng()
-          };
-          completed++;
-          if (onProgress) onProgress(completed, addresses.length);
-          if (completed === addresses.length) resolve(results);
-          setTimeout(() => geocodeOne(i + 1), 100); // 100ms間隔でリクエスト
+          done(i, { lat: res[0].geometry.location.lat(), lng: res[0].geometry.location.lng() });
         } else if (status === 'OVER_QUERY_LIMIT') {
-          // レート制限 → 1秒待ってリトライ
-          setTimeout(() => geocodeOne(i), 1000);
+          nextIdx--; // 戻してリトライ
+          setTimeout(launch, 1000);
         } else {
-          // その他エラー → スキップ
-          completed++;
-          if (onProgress) onProgress(completed, addresses.length);
-          if (completed === addresses.length) resolve(results);
-          setTimeout(() => geocodeOne(i + 1), 100);
+          done(i, null);
         }
       });
     }
-    geocodeOne(0);
+
+    // 最初にCONCURRENCY件を同時に開始
+    const initialBatch = Math.min(CONCURRENCY, targets.length);
+    for (let k = 0; k < initialBatch; k++) launch();
   });
 }
 
@@ -666,18 +666,20 @@ function loadCSV(file) {
       const shopsNeedGeocode = shops.map(shop => {
         const saved = savedStores[shop.code];
         if (saved && (saved.customLat || saved.lat)) {
-          return null; // Geocoding不要
+          return null; // 保存済み → Geocoding不要
         }
         return shop.addr;
       });
 
       const needCount = shopsNeedGeocode.filter(Boolean).length;
-      document.getElementById('status').textContent = needCount > 0
-        ? `${shops.length}件を地図に配置中... (0/${needCount})`
-        : `${shops.length}件を地図に配置中...`;
+      if (needCount === 0) {
+        document.getElementById('status').textContent = `${shops.length}件を地図に配置中...`;
+      } else {
+        document.getElementById('status').textContent = `${shops.length}件中${needCount}件を座標取得中... (0/${needCount})`;
+      }
 
       geocodeAddresses(shopsNeedGeocode, (done, total) => {
-        document.getElementById('status').textContent = `地図に配置中... (${done}/${total})`;
+        document.getElementById('status').textContent = `座標取得中... (${done}/${total})`;
       }).then(coords => {
         // 店舗管理に座標を自動登録（Geocoding結果）
         shops.forEach((shop, i) => {
