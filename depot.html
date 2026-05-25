@@ -104,7 +104,7 @@
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
     #edit-map {
-      width: 100%; height: 400px; border-radius: 8px;
+      width: 100%; height: 500px; border-radius: 8px;
       border: 1px solid rgba(255,255,255,0.1); background: #1a2535;
     }
     .map-hint {
@@ -281,7 +281,7 @@ function selectNew() {
 function renderNewPanel() {
   document.getElementById('right-content').innerHTML = `
     <div class="edit-form">
-      <div class="form-row">
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:8px;">
         <div class="form-group">
           <label>名称 *</label>
           <input type="text" id="edit-name" placeholder="例：神戸西デポ">
@@ -296,11 +296,11 @@ function renderNewPanel() {
           </select>
         </div>
       </div>
-      <div class="form-group">
-        <label>住所</label>
-        <input type="text" id="edit-addr" placeholder="例：兵庫県神戸市西区見津が丘7丁目1-3">
-      </div>
-      <div class="form-row">
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div class="form-group">
+          <label>住所</label>
+          <input type="text" id="edit-addr" placeholder="例：兵庫県神戸市西区見津が丘7丁目1-3">
+        </div>
         <div class="form-group">
           <label>CSV拠点コード</label>
           <input type="text" id="edit-csvcode" placeholder="例：2806">
@@ -310,14 +310,17 @@ function renderNewPanel() {
           <input type="text" id="edit-carriercode" placeholder="例：S001">
         </div>
       </div>
-      <div class="form-group">
-        <label>座標</label>
-        <div class="coord-row">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div class="form-group">
+          <label>緯度</label>
           <input type="text" id="edit-lat" placeholder="緯度" oninput="updateMapFromInput()">
+        </div>
+        <div class="form-group">
+          <label>経度</label>
           <input type="text" id="edit-lng" placeholder="経度" oninput="updateMapFromInput()">
         </div>
       </div>
-      <div class="map-hint"><strong>地図をクリック</strong>して出発地点を設定できます。住所を入力して「住所から取得」を押すと自動で座標が入ります。</div>
+      <div class="map-hint" style="padding:7px 12px;margin-bottom:6px;"><strong>地図をクリック</strong>して座標を設定 ／ 住所入力後「取得」で自動設定</div>
       <div id="edit-map"></div>
       <div class="map-status" id="map-status">地図をクリックして座標を設定してください</div>
       <div class="btn-row">
@@ -337,7 +340,7 @@ function renderEditPanel(id) {
   const lng = d.lng || '';
   document.getElementById('right-content').innerHTML = `
     <div class="edit-form">
-      <div class="form-row">
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:8px;">
         <div class="form-group">
           <label>名称 *</label>
           <input type="text" id="edit-name" value="${d.name}">
@@ -352,11 +355,11 @@ function renderEditPanel(id) {
           </select>
         </div>
       </div>
-      <div class="form-group">
-        <label>住所</label>
-        <input type="text" id="edit-addr" value="${d.addr||''}">
-      </div>
-      <div class="form-row">
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div class="form-group">
+          <label>住所</label>
+          <input type="text" id="edit-addr" value="${d.addr||''}">
+        </div>
         <div class="form-group">
           <label>CSV拠点コード</label>
           <input type="text" id="edit-csvcode" value="${d.csvCode||''}">
@@ -366,16 +369,19 @@ function renderEditPanel(id) {
           <input type="text" id="edit-carriercode" value="${d.carrierCode||''}">
         </div>
       </div>
-      <div class="form-group">
-        <label>座標</label>
-        <div class="coord-row">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div class="form-group">
+          <label>緯度</label>
           <input type="text" id="edit-lat" placeholder="緯度" value="${lat}" oninput="updateMapFromInput()">
+        </div>
+        <div class="form-group">
+          <label>経度</label>
           <input type="text" id="edit-lng" placeholder="経度" value="${lng}" oninput="updateMapFromInput()">
         </div>
       </div>
-      <div class="map-hint"><strong>地図をクリック</strong>して出発地点を設定できます。ピンをドラッグしても移動できます。</div>
+      <div class="map-hint" style="padding:7px 12px;margin-bottom:6px;"><strong>地図をクリック</strong>して出発地点を設定 ／ ピンをドラッグでも移動できます</div>
       <div id="edit-map"></div>
-      <div class="map-status" id="map-status">${lat?`現在の座標: ${parseFloat(lat).toFixed(5)}, ${parseFloat(lng).toFixed(5)}`:'座標未設定'}</div>
+      <div class="map-status" id="map-status">${lat?`座標: ${parseFloat(lat).toFixed(5)}, ${parseFloat(lng).toFixed(5)}`:'座標未設定'}</div>
       <div class="btn-row">
         <button class="btn-save" onclick="saveDepot()">💾 保存</button>
         <button class="btn-geocode" onclick="geocodeAddr()">🔍 住所から取得</button>
