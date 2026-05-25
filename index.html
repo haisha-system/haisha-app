@@ -654,21 +654,59 @@ function loadCSV(file) {
       if (routeLine) { routeLine.setMap(null); routeLine = null; }
       locations = []; orderedLocations = []; assignments = {}; currentDeliveryId = null;
 
-      const shops = Array.from(shopMap.values());
-      document.getElementById('status').textContent = `${shops.length}件を地図に配置中... (0/${shops.length})`;
+      // 届け先コードをshopに保存しておく
+      const shopEntries = Array.from(shopMap.entries()); // [code, shop]
+      const shops = shopEntries.map(([code, shop]) => ({ ...shop, code }));
 
-      const addresses = shops.map(s => s.addr);
-      geocodeAddresses(addresses, (done, total) => {
+      // 店舗管理から保存済み座標を読み込む
+      let savedStores = {};
+      try { savedStores = JSON.parse(localStorage.getItem('haisha_stores') || '{}'); } catch(e) {}
+
+      // 保存済み座標がある店舗はGeocoding不要
+      const shopsNeedGeocode = shops.map(shop => {
+        const saved = savedStores[shop.code];
+        if (saved && (saved.customLat || saved.lat)) {
+          return null; // Geocoding不要
+        }
+        return shop.addr;
+      });
+
+      const needCount = shopsNeedGeocode.filter(Boolean).length;
+      document.getElementById('status').textContent = needCount > 0
+        ? `${shops.length}件を地図に配置中... (0/${needCount})`
+        : `${shops.length}件を地図に配置中...`;
+
+      geocodeAddresses(shopsNeedGeocode, (done, total) => {
         document.getElementById('status').textContent = `地図に配置中... (${done}/${total})`;
       }).then(coords => {
+        // 店舗管理に座標を自動登録（Geocoding結果）
+        shops.forEach((shop, i) => {
+          const saved = savedStores[shop.code];
+          if (!saved) {
+            savedStores[shop.code] = { name: shop.name, addr: shop.addr, lat: null, lng: null, hasCustom: false };
+          }
+          if (coords[i]) {
+            savedStores[shop.code].lat = coords[i].lat;
+            savedStores[shop.code].lng = coords[i].lng;
+          }
+          savedStores[shop.code].name = shop.name;
+          savedStores[shop.code].addr = shop.addr;
+        });
+        try { localStorage.setItem('haisha_stores', JSON.stringify(savedStores)); } catch(e) {}
+
         markers.forEach(m => m.setMap(null)); markers = [];
         shops.forEach((shop, i) => {
-          const c = coords[i];
-          if (!c) return; // Geocoding失敗はスキップ
+          const saved = savedStores[shop.code];
+          // 優先順位：①手動修正座標 ②Geocoding結果 ③スキップ
+          const lat = saved?.customLat || saved?.lat || coords[i]?.lat;
+          const lng = saved?.customLng || saved?.lng || coords[i]?.lng;
+          const c = (lat && lng) ? { lat, lng } : null;
+          if (!c) return;
           const loc = {
             name: shop.name, addr: shop.addr,
             lat: c.lat, lng: c.lng,
-            items: shop.items, vol: parseFloat(shop.vol.toFixed(3))
+            items: shop.items, vol: parseFloat(shop.vol.toFixed(3)),
+            code: shop.code
           };
           locations.push(loc);
           const markerIdx = locations.length - 1;
