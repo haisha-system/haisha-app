@@ -953,7 +953,7 @@ function drawRoute() {
         line.setMap(map);
         routeLines.push({ line, driverId, bin });
 
-        // マーカー描画（IIFEで番号を確実にキャプチャ）
+        // マーカー描画：ドライバー内の順番（oi+1）でピン番号をつける
         for (let oi = 0; oi < ordered.length; oi++) {
           totalStops++;
           (function(sn, loc) {
@@ -970,7 +970,7 @@ function drawRoute() {
             });
             markers.push(marker);
             driverLocs.push(loc);
-          })(totalStops, ordered[oi]);
+          })(oi + 1, ordered[oi]);  // totalStopsではなくドライバー内順番(oi+1)を使う
         }
       });
       orderedLocations.push(...driverLocs);
@@ -1390,8 +1390,13 @@ function renderRightSidebar() {
     const dName = driverIdx >= 0 ? drivers[driverIdx].name : '未割当';
     const bin = asgn ? `第${asgn.bin}便` : '';
 
-    // 番号は常に表示（ルート表示前後どちらでも）
-    const stopNumStr = activeDriverFilter !== 'unassigned' ? String(loopIdx + 1) : '';
+    // 番号表示：ルート表示後のみ表示（地図ピンと一致させる）
+    let stopNumStr = '';
+    if (activeDriverFilter === 'unassigned') {
+      stopNumStr = ''; // 未割当フィルターは番号なし
+    } else if (orderedLocations.length > 0) {
+      stopNumStr = String(loopIdx + 1); // ルート表示後：ループ順（地図ピンと一致）
+    }
     card.innerHTML = `
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;">
         <div style="flex:1;min-width:0;">
