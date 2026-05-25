@@ -103,6 +103,12 @@
     .depot-label { font-size: 11px; color: #a78bfa; font-weight: bold; margin-bottom: 2px; }
     .depot-name  { font-weight: 500; color: rgba(255,255,255,0.9); font-size: 12px; }
     .depot-addr  { color: rgba(255,255,255,0.4); font-size: 11px; margin-top: 2px; }
+    .depot-filter-btn {
+      padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2);
+      background: transparent; color: rgba(255,255,255,0.5); font-size: 10px;
+      cursor: pointer; font-family: inherit; white-space: nowrap;
+    }
+    .depot-filter-btn.active { background: #3b82f6; color: white; border-color: #3b82f6; font-weight: 700; }
 
     /* ドライバーカード（サイドバー） */
     .driver-sb-card {
@@ -236,10 +242,11 @@
 <div id="main">
   <!-- 左サイドバー：ドライバー一覧 -->
   <div id="sidebar-left">
-    <div class="depot-card">
+    <div class="depot-card" style="cursor:default;">
       <div class="depot-label">🏭 出発地</div>
-      <div class="depot-name">メープルツリー神戸ロジスティクスセンター</div>
-      <div class="depot-addr">兵庫県神戸市西区見津が丘7丁目1-3</div>
+      <div class="depot-name" id="depot-display-name">メープルツリー神戸ロジスティクスセンター</div>
+      <div class="depot-addr" id="depot-display-addr">兵庫県神戸市西区見津が丘7丁目1-3</div>
+      <div id="depot-filter-btns" style="display:none;margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;"></div>
     </div>
     <div style="font-size:11px;letter-spacing:0.1em;color:#3b82f6;font-weight:700;margin-bottom:8px;text-transform:uppercase;">本日稼働ドライバー</div>
     <div id="driver-list-sidebar" style="flex:1;"></div>
@@ -410,8 +417,8 @@ function setDepotByCode(csvCode) {
   const useAddr = depot.departAddr || depot.loadAddr;
 
   // デポ情報をサイドバーに反映
-  const nameEl = document.querySelector('.depot-name');
-  const addrEl = document.querySelector('.depot-addr');
+  const nameEl = document.getElementById('depot-display-name') || document.querySelector('.depot-name');
+  const addrEl = document.getElementById('depot-display-addr') || document.querySelector('.depot-addr');
   if (nameEl) nameEl.textContent = depot.name;
   if (addrEl) addrEl.textContent = useAddr;
 
@@ -454,6 +461,7 @@ const DRIVER_COLORS = [
 
 let map, markers = [], routeLine = null, depotMarker = null;
 let locations = [], currentDate = '', orderedLocations = [], currentBusho = 1;
+let activeDepotFilter = null; // null=全表示, '2806'=神戸西, '2805'=丹波 など
 let currentTab = 'all', selectedDriverTab = 0;
 let drivers = [], assignments = {};
 let currentDeliveryId = null;
@@ -654,6 +662,7 @@ function loadCSV(file) {
       const shopMap = new Map();
       const rows = lines.slice(1);
 
+      const depotCodeIdx = headers.findIndex(h => h.includes('配送拠点コード'));
       rows.forEach(line => {
         if (!line.trim()) return;
         const cols = parseCSVLine(line);
@@ -662,15 +671,17 @@ function loadCSV(file) {
         const addr = cols[addrIdx] || '';
         const items = parseFloat(cols[itemIdx]) || 0;
         const vol   = parseFloat(cols[volIdx])   || 0;
+        const depotCode = depotCodeIdx >= 0 ? (cols[depotCodeIdx]||'').trim() : '';
 
         if (!name.trim() || !addr.trim()) return;
 
         if (!shopMap.has(code)) {
-          shopMap.set(code, { name: name.trim(), addr: addr.trim(), items: 0, vol: 0 });
+          shopMap.set(code, { name: name.trim(), addr: addr.trim(), items: 0, vol: 0, depotCode });
         }
         const shop = shopMap.get(code);
         shop.items += items;
         shop.vol   += vol;
+        if (depotCode) shop.depotCode = depotCode;
       });
 
       // 配送日取得
@@ -776,7 +787,8 @@ function loadCSV(file) {
             name: shop.name, addr: shop.addr,
             lat: c.lat, lng: c.lng,
             items: shop.items, vol: parseFloat(shop.vol.toFixed(3)),
-            code: shop.code
+            code: shop.code,
+            depotCode: shop.depotCode || ''
           };
           locations.push(loc);
           const markerIdx = locations.length - 1;
@@ -794,6 +806,7 @@ function loadCSV(file) {
         updateSidebar(locations, false);
         renderDriverSidebar();
         renderRightSidebar();
+        renderDepotFilterBtns();
         saveLocationsToSession();
         if (locations.length > 0) {
           const bounds = new google.maps.LatLngBounds();
@@ -975,6 +988,132 @@ function renderDriverTab() {
 }
 
 // ===== サイドバー =====
+// デポフィルターボタンを更新
+function renderDepotFilterBtns() {
+  const container = document.getElementById('depot-filter-btns');
+  if (!container) return;
+
+  // 読み込まれているデポコードを収集
+  const depotCodes = [...new Set(locations.map(l => l.depotCode).filter(Boolean))];
+  if (depotCodes.length <= 1) {
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = 'flex';
+
+  const depots = window._depots || [];
+  const btns = [{ code: null, label: '全表示' }, ...depotCodes.map(code => {
+    const depot = depots.find(d => d.csvCode === code);
+    return { code, label: depot ? depot.name : code };
+  })];
+
+  container.innerHTML = '';
+  btns.forEach(({ code, label }) => {
+    const btn = document.createElement('button');
+    btn.className = 'depot-filter-btn' + (activeDepotFilter === code ? ' active' : '');
+    btn.textContent = label;
+    btn.onclick = () => setDepotFilter(code);
+    container.appendChild(btn);
+  });
+}
+
+function setDepotFilter(code) {
+  activeDepotFilter = code;
+  renderDepotFilterBtns();
+
+  // デポを切り替え
+  if (code === null) {
+    // 全表示：最初のデポに戻す
+    const firstCode = locations.find(l => l.depotCode)?.depotCode;
+    if (firstCode) setDepotByCode(firstCode);
+  } else {
+    setDepotByCode(code);
+  }
+
+  // 地図のマーカーを再描画
+  const filtered = code === null ? locations : locations.filter(l => l.depotCode === code);
+  markers.forEach(m => m.setMap(null)); markers = [];
+  clearRouteLines(); orderedLocations = [];
+
+  filtered.forEach((loc) => {
+    const locIdx = locations.indexOf(loc);
+    const asgn = assignments[locIdx];
+    const driverIdx = asgn ? drivers.findIndex(d => d.id === asgn.driverId) : -1;
+    const fillColor = driverIdx >= 0 ? DRIVER_COLORS[driverIdx % DRIVER_COLORS.length] : '#e74c3c';
+    const marker = new google.maps.Marker({
+      position: { lat: loc.lat, lng: loc.lng }, map, title: loc.name,
+      label: { text: String(filtered.indexOf(loc)+1), color: 'white', fontSize: '11px', fontWeight: 'bold' },
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 14, fillColor, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 }
+    });
+    marker.addListener('click', () => new google.maps.InfoWindow({
+      content: `<b>${loc.name}</b><br><small>${loc.addr}</small>`
+    }).open(map, marker));
+    markers.push(marker);
+  });
+
+  // 地図範囲を調整
+  if (filtered.length > 0) {
+    const bounds = new google.maps.LatLngBounds();
+    bounds.extend({ lat: DEPOT.lat, lng: DEPOT.lng });
+    filtered.forEach(l => bounds.extend({ lat: l.lat, lng: l.lng }));
+    map.fitBounds(bounds);
+  }
+
+  // サイドバー更新
+  updateSidebar(filtered, false);
+  renderDriverSidebar();
+  renderRightSidebarFiltered(filtered);
+  document.getElementById('status').textContent =
+    code === null ? `全${locations.length}件表示` : `${filtered.length}件表示（${document.querySelector('.depot-filter-btn.active')?.textContent||code}）`;
+}
+
+function renderRightSidebarFiltered(filtered) {
+  const el = document.getElementById('right-stop-list');
+  const title = document.getElementById('right-sidebar-title');
+  if (!el) return;
+  title.textContent = '配送先リスト';
+  el.innerHTML = '';
+  if (filtered.length === 0) {
+    el.innerHTML = '<p style="font-size:11px;color:rgba(255,255,255,0.3);">表示する配送先がありません</p>';
+    return;
+  }
+  const totalItems = filtered.reduce((s,loc)=>s+(Number(loc.items)||0),0);
+  const totalVol = filtered.reduce((s,loc)=>s+(Number(loc.vol)||0),0);
+  const summary = document.createElement('div');
+  summary.style.cssText = 'font-size:10px;color:rgba(255,255,255,0.3);margin-bottom:6px;padding:3px 6px;background:rgba(255,255,255,0.04);border-radius:4px;';
+  summary.textContent = `${filtered.length}件 / ${totalItems}個 / ${totalVol.toFixed(1)}才`;
+  el.appendChild(summary);
+  filtered.forEach((loc, loopIdx) => {
+    const locIdx = locations.indexOf(loc);
+    const asgn = assignments[locIdx];
+    const driverIdx = asgn ? drivers.findIndex(d => d.id === asgn.driverId) : -1;
+    const color = driverIdx >= 0 ? DRIVER_COLORS[driverIdx % DRIVER_COLORS.length] : 'rgba(255,255,255,0.2)';
+    const card = document.createElement('div');
+    card.className = 'stop-card';
+    card.draggable = true;
+    card.dataset.locIdx = locIdx;
+    card.style.borderLeft = `3px solid ${color}`;
+    const dName = driverIdx >= 0 ? drivers[driverIdx].name : '未割当';
+    const bin = asgn ? `第${asgn.bin}便` : '';
+    card.innerHTML = `
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px;">
+            <span style="font-weight:600;color:rgba(255,255,255,0.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${loc.name}</span>
+          </div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.35);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${loc.addr}</div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px;display:flex;gap:6px;">
+            ${loc.items ? `<span>📦${loc.items}個</span>` : ''}
+            ${loc.vol   ? `<span>📐${Number(loc.vol).toFixed(1)}才</span>` : ''}
+            ${asgn ? `<span style="color:${color};">${dName} ${bin}</span>` : '<span style="color:#f59e0b;">未割当</span>'}
+          </div>
+        </div>
+        <button onclick="removeAssignment(${locIdx})" style="background:rgba(239,68,68,0.15);color:#f87171;border:none;border-radius:3px;padding:2px 7px;font-size:10px;cursor:pointer;flex-shrink:0;">解除</button>
+      </div>`;
+    el.appendChild(card);
+  });
+}
+
 function updateSidebar(locs, isOptimal) {
   document.getElementById('sidebar-title').textContent = isOptimal ? `最適配送順序（${locs.length}件）` : `配送先リスト（${locs.length}件）`;
   const list = document.getElementById('stop-list');
