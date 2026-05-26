@@ -341,7 +341,7 @@ function renderNewPanel() {
       <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;margin-bottom:8px;">
         <div class="form-group">
           <label>住所</label>
-          <input type="text" id="edit-addr" placeholder="例：兵庫県神戸市西区見津が丘7丁目1-3">
+          <input type="text" id="edit-addr" placeholder="例：兵庫県神戸市西区見津が丘7丁目1-3" onblur="autoGeocodeAddr()">
         </div>
         <div class="form-group">
           <label>CSV拠点コード</label>
@@ -362,9 +362,9 @@ function renderNewPanel() {
           <input type="text" id="edit-lng" placeholder="経度" oninput="updateMapFromInput()">
         </div>
       </div>
-      <div class="map-hint" style="padding:7px 12px;margin-bottom:6px;"><strong>地図をクリック</strong>して座標を設定 ／ 住所入力後「取得」で自動設定</div>
+      <div class="map-hint" style="padding:7px 12px;margin-bottom:6px;"><strong>住所を入力して離れると自動でピンが立ちます</strong> ／ 地図クリックやドラッグでも調整できます</div>
       <div id="edit-map"></div>
-      <div class="map-status" id="map-status">地図をクリックして座標を設定してください</div>
+      <div class="map-status" id="map-status">住所を入力してください（自動で座標を取得します）</div>
       <div class="btn-row">
         <button class="btn-save" onclick="saveDepot()">＋ 登録</button>
         <button class="btn-geocode" onclick="geocodeAddr()">🔍 住所から取得</button>
@@ -516,6 +516,41 @@ function updateMapFromInput() {
       });
     }
   }
+}
+
+// 住所入力欄からフォーカスが外れたとき自動で座標取得（座標未設定の場合のみ）
+function autoGeocodeAddr() {
+  const addr = document.getElementById('edit-addr').value.trim();
+  const lat   = document.getElementById('edit-lat').value.trim();
+  const lng   = document.getElementById('edit-lng').value.trim();
+  if (!addr || (lat && lng)) return; // 住所なし or すでに座標あり → 何もしない
+  document.getElementById('map-status').textContent = '住所から座標を取得中...';
+  new google.maps.Geocoder().geocode({ address: addr }, (res, status) => {
+    if (status === 'OK') {
+      const la = res[0].geometry.location.lat();
+      const ln = res[0].geometry.location.lng();
+      document.getElementById('edit-lat').value = la.toFixed(7);
+      document.getElementById('edit-lng').value = ln.toFixed(7);
+      const pos = { lat: la, lng: ln };
+      editMap.setCenter(pos); editMap.setZoom(15);
+      if (editMarker) { editMarker.setPosition(pos); }
+      else {
+        editMarker = new google.maps.Marker({
+          position: pos, map: editMap, draggable: true,
+          icon: { path: google.maps.SymbolPath.CIRCLE, scale: 13, fillColor: '#f59e0b', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 }
+        });
+        editMarker.addListener('dragend', () => {
+          const p = editMarker.getPosition();
+          document.getElementById('edit-lat').value = p.lat().toFixed(7);
+          document.getElementById('edit-lng').value = p.lng().toFixed(7);
+          document.getElementById('map-status').textContent = `座標: ${p.lat().toFixed(5)}, ${p.lng().toFixed(5)}`;
+        });
+      }
+      document.getElementById('map-status').textContent = `取得完了: ${la.toFixed(5)}, ${ln.toFixed(5)}`;
+    } else {
+      document.getElementById('map-status').textContent = `住所が見つかりませんでした（手動で地図をクリックして設定してください）`;
+    }
+  });
 }
 
 function geocodeAddr() {
