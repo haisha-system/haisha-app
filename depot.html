@@ -204,8 +204,8 @@ let isNew = false;
 
 // 既知の正しい座標（住所から確認済み）
 const KNOWN_COORDS = {
-  '兵庫県神戸市西区見津が丘7丁目1-3': { lat: 34.7309, lng: 135.0867 },
-  '兵庫県丹波市氷上町氷上10':         { lat: 35.1167, lng: 135.0167 }
+  '兵庫県神戸市西区見津が丘7丁目1-3': { lat: 34.7309,  lng: 135.0867  },
+  '兵庫県丹波市氷上町氷上10':         { lat: 35.18062, lng: 135.04266 }
 };
 
 const TYPE_ORDER = { main:0, sub:1, own:2, carrier:3 };
@@ -223,7 +223,7 @@ function loadData() {
   if (depots.length === 0) {
     depots = [
       { id:1, name:'神戸西デポ', type:'main', addr:'兵庫県神戸市西区見津が丘7丁目1-3', departAddr:'', csvCode:'2806', carrierCode:'', lat:34.7309, lng:135.0867 },
-      { id:2, name:'丹波デポ',   type:'sub',  addr:'兵庫県丹波市氷上町氷上10',           departAddr:'', csvCode:'2805', carrierCode:'', lat:35.1167, lng:135.0167 }
+      { id:2, name:'丹波デポ',   type:'sub',  addr:'兵庫県丹波市氷上町氷上10',           departAddr:'', csvCode:'2805', carrierCode:'', lat:35.18062, lng:135.04266 }
     ];
     mappings = { '2806':1, '2805':2 };
     saveData();
