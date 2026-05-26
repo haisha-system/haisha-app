@@ -303,7 +303,7 @@
 <script>
 // ===== Supabase設定 =====
 const SUPABASE_URL = 'https://hpycoozpspcxtesuzdpw.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhweWNvb3pwc3BjeHRlc3V6ZHB3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyOTEwMzgsImV4cCI6MjA5NDg2NzAzOH0._5uJmcBC7_-DwUW6JzXqlIXXn-NLluDO8BML8SGyaRA';
+const SUPABASE_KEY = 'sb_publishable_mRR0XWKLS8Zy7ivt8-OPeg_iWT3roQ9';
 const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Supabase接続確認
@@ -877,7 +877,7 @@ function loadCSV(file) {
       // 列インデックスを取得
       const nameIdx  = headers.findIndex(h => h.includes('届け先名') || h.includes('顧客名称'));
       const addrIdx  = headers.findIndex(h => h.includes('届け先住所') || h.includes('顧客住所1'));
-      const itemIdx  = headers.findIndex(h => h === 'ケースロケーション出荷数（ケース換算）' || h === '個数');
+      const itemIdx  = headers.findIndex(h => h === '出荷数' || h === '個数');
       const volIdx   = headers.findIndex(h => h === '明細才数' || h === '才数');
       const dateIdx  = headers.findIndex(h => h.includes('配送年月日') || h.includes('日付'));
       const codeIdx  = headers.findIndex(h => h.includes('届け先コード') || h.includes('顧客コード'));
