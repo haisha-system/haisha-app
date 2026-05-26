@@ -677,6 +677,7 @@ function initMap() {
   // CSVを読み込んだ際は setDepotByCode() で座標が更新される。
   setTimeout(() => {
     loadPendingFile();
+  restoreSnapshotFromHistory();
     // pendingFileがなければsessionStorageから復元
     if (!sessionStorage.getItem('pendingFileName') && !sessionStorage.getItem('pendingFileData')) {
       if (loadLocationsFromSession()) {
@@ -2090,6 +2091,54 @@ loadDepotsFromStorage();
 checkSupabase();
 renderDriverSidebar();
 renderRightSidebar();
+
+
+// history.htmlから呼び出されたスナップショットを復元
+function restoreSnapshotFromHistory() {
+  const raw = sessionStorage.getItem('haisha_restore_snapshot');
+  if (!raw) return;
+  sessionStorage.removeItem('haisha_restore_snapshot');
+  try {
+    const s = JSON.parse(raw);
+    currentDate      = s.currentDate || '';
+    currentBusho     = s.currentBusho || 1;
+    DEPOT            = Object.assign({}, s.DEPOT);
+    locations        = (s.locations || []).map(function(l) { return Object.assign({}, l); });
+    orderedLocations = (s.orderedLocations || []).map(function(l) { return Object.assign({}, l); });
+    assignments      = JSON.parse(JSON.stringify(s.assignments || {}));
+
+    markers.forEach(function(m) { m.setMap(null); }); markers = [];
+    if (routeLine) { routeLine.setMap(null); routeLine = null; }
+    clearRouteLines();
+
+    if (depotMarker) depotMarker.setMap(null);
+    depotMarker = new google.maps.Marker({
+      position: { lat: DEPOT.lat, lng: DEPOT.lng }, map: map,
+      title: DEPOT.name,
+      icon: { path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW, scale: 6, fillColor:'#8b5cf6', fillOpacity:1, strokeColor:'#fff', strokeWeight:2 }
+    });
+
+    var bounds = new google.maps.LatLngBounds();
+    bounds.extend({ lat: DEPOT.lat, lng: DEPOT.lng });
+    locations.forEach(function(loc, i) {
+      var marker = new google.maps.Marker({
+        position: { lat: loc.lat, lng: loc.lng }, map: map,
+        label: { text: String(i+1), color:'white', fontSize:'11px', fontWeight:'bold' },
+        title: loc.name
+      });
+      markers.push(marker);
+      bounds.extend({ lat: loc.lat, lng: loc.lng });
+    });
+    map.fitBounds(bounds);
+
+    updateDateLabel();
+    renderRightSidebar();
+    renderDriverSidebar();
+    document.getElementById('status').textContent = '「' + s.name + '」を呼び出しました（' + locations.length + '件）';
+  } catch(e) {
+    console.error('スナップショット復元エラー:', e);
+  }
+}
 
 // メニューから渡されたファイルを自動読み込み
 function loadPendingFile() {
