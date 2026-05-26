@@ -133,7 +133,9 @@
           </div>
           <div class="form-group">
             <label>担当車両</label>
-            <input type="text" id="new-vehicle" placeholder="例：2t車">
+            <select id="new-vehicle">
+              <option value="">-- 未設定 --</option>
+            </select>
           </div>
         </div>
         <div class="form-row">
@@ -259,7 +261,8 @@ function addDriver() {
   const name    = document.getElementById('new-name').value.trim();
   const code    = document.getElementById('new-code').value.trim();
   const depot   = document.getElementById('new-depot').value;
-  const vehicle = document.getElementById('new-vehicle').value.trim();
+  const vehicleId = document.getElementById('new-vehicle').value;
+  const vehicle = (function() { try { var vs = JSON.parse(localStorage.getItem('haisha_vehicles')||'[]'); var v = vs.find(function(x){ return String(x.id)===String(vehicleId); }); return v ? v.name : ''; } catch(e){ return ''; } })();
   const phone   = document.getElementById('new-phone').value.trim();
   const area    = document.getElementById('new-area').value.trim();
   const carrier  = document.getElementById('new-carrier').value;
@@ -271,13 +274,13 @@ function addDriver() {
   const editId = document.getElementById('form-title').dataset.editId || '';
   if (editId) {
     const idx = drivers.findIndex(d => String(d.id) === String(editId));
-    if (idx >= 0) drivers[idx] = { ...drivers[idx], name, code, depot, vehicle, phone, area, carrier, yoizumi, note };
+    if (idx >= 0) drivers[idx] = { ...drivers[idx], name, code, depot, vehicle, vehicleId, phone, area, carrier, yoizumi, note };
     document.getElementById('form-title').textContent = '新規登録';
     document.getElementById('form-title').dataset.editId = '';
     showToast('更新しました');
   } else {
     if (drivers.find(d => d.code === code)) { alert('この社員コードは既に使用されています'); return; }
-    drivers.push({ id: Date.now(), name, code, depot, vehicle, phone, area, carrier, yoizumi, note });
+    drivers.push({ id: Date.now(), name, code, depot, vehicle, vehicleId, phone, area, carrier, yoizumi, note });
     showToast(`${name} を登録しました`);
   }
   saveDrivers(); renderList(); clearForm();
@@ -289,7 +292,7 @@ function editDriver(id) {
   document.getElementById('new-name').value    = d.name;
   document.getElementById('new-code').value    = d.code || '';
   document.getElementById('new-depot').value   = d.depot || 'both';
-  document.getElementById('new-vehicle').value = d.vehicle || '';
+  updateVehicleOptions(d.vehicleId || '');
   document.getElementById('new-phone').value   = d.phone || '';
   document.getElementById('new-area').value    = d.area || '';
   document.getElementById('new-carrier').value  = d.carrier || '';
@@ -307,7 +310,8 @@ function deleteDriver(id) {
 }
 
 function clearForm() {
-  ['new-name','new-code','new-vehicle','new-phone','new-area','new-note'].forEach(id => document.getElementById(id).value = '');
+  ['new-name','new-code','new-phone','new-area','new-note'].forEach(id => document.getElementById(id).value = '');
+  updateVehicleOptions('');
   document.getElementById('new-depot').value   = 'both';
   document.getElementById('new-carrier').value  = '';
   document.getElementById('form-title').textContent = '新規登録';
@@ -358,8 +362,23 @@ function updateCarrierOptions() {
 
   } catch(e){}
 }
+function updateVehicleOptions(selectedId) {
+  var vehicles = [];
+  try { vehicles = JSON.parse(localStorage.getItem('haisha_vehicles') || '[]'); } catch(e) {}
+  var sel = document.getElementById('new-vehicle');
+  var cur = selectedId !== undefined ? selectedId : sel.value;
+  sel.innerHTML = '<option value="">-- 未設定 --</option>';
+  vehicles.forEach(function(v) {
+    var opt = document.createElement('option');
+    opt.value = v.id;
+    opt.textContent = v.name + (v.maxVol ? '（最大' + v.maxVol + '才/' + v.maxItems + '個）' : '');
+    if (String(v.id) === String(cur)) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
 loadDrivers();
 updateCarrierOptions();
+updateVehicleOptions('');
 renderList();
 </script>
 </body>
