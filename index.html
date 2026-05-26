@@ -291,7 +291,7 @@
   <div id="assign-summary"></div>
   <div id="assign-content"></div>
   <div class="assign-actions">
-    <button class="btn-auto"       onclick="autoAssign()">⚡ 自動配車</button>
+    <button class="btn-auto"       onclick="autoAssign()">⚡ 個数で自動振り分け</button>
     <button class="btn-export-all" onclick="exportAllDrivers()">📥 全員分Excel出力</button>
     <button class="btn-apply"      onclick="applyAssign()">✅ 地図に反映</button>
     <button class="btn-cancel"     onclick="closeAllPanels()">閉じる</button>
@@ -877,7 +877,7 @@ function loadCSV(file) {
       // 列インデックスを取得
       const nameIdx  = headers.findIndex(h => h.includes('届け先名') || h.includes('顧客名称'));
       const addrIdx  = headers.findIndex(h => h.includes('届け先住所') || h.includes('顧客住所1'));
-      const itemIdx  = headers.findIndex(h => h === '出荷数' || h === '個数');
+      const itemIdx  = headers.findIndex(h => h === 'ケースロケーション出荷数（ケース換算）' || h === '個数');
       const volIdx   = headers.findIndex(h => h === '明細才数' || h === '才数');
       const dateIdx  = headers.findIndex(h => h.includes('配送年月日') || h.includes('日付'));
       const codeIdx  = headers.findIndex(h => h.includes('届け先コード') || h.includes('顧客コード'));
@@ -1630,92 +1630,14 @@ function removeAssignment(locIdx) { delete assignments[locIdx]; renderAssignPane
 function assignToDriver(locIdx,driverId) { if(!driverId) return; assignments[locIdx]={driverId:parseInt(driverId)||driverId,bin:1}; renderAssignPanel(); }
 
 function autoAssign() {
-  if (drivers.length === 0) { alert('ドライバーを先に登録してください'); return; }
-
-  // 本日稼働中のドライバーのみ
-  const activeDrivers = drivers.filter(d => d.availableToday !== false);
-  if (activeDrivers.length === 0) { alert('本日稼働中のドライバーがいません'); return; }
-
-  // 車両データを取得（才数・個数の上限に使う）
-  let vehicles = [];
-  try { vehicles = JSON.parse(localStorage.getItem('haisha_vehicles') || '[]'); } catch(e) {}
-
-  // ドライバーごとの車両情報を取得（drivers.htmlのvehicleIdで紐付け）
-  function getVehicle(driver) {
-    if (driver.vehicleId) {
-      const v = vehicles.find(v => String(v.id) === String(driver.vehicleId));
-      if (v) return v;
-    }
-    return { maxVol: 0, maxItems: 0 }; // 車両未設定 → 制限なし
-  }
-
-  // 配送先を才数の多い順に並べる
-  const sorted = locations
-    .map((loc, i) => ({ loc, i, items: Number(loc.items) || 0, vol: Number(loc.vol) || 0 }))
-    .sort((a, b) => b.vol - a.vol || b.items - a.items);
-
-  assignments = {};
-
-  // ドライバーごとの積載状況
-  const loads = {};
-  activeDrivers.forEach(d => { loads[d.id] = { vol: 0, items: 0 }; });
-
-  // 地理的クラスタリング：デポから近い順にドライバーを割り当てる
-  // まず全配送先を地理的にグループ分けしてから積載制限内で割り当てる
-  sorted.forEach(({ i, items, vol }) => {
-    let bestDriver = null;
-    let bestScore = Infinity;
-
-    activeDrivers.forEach(driver => {
-      const v = getVehicle(driver);
-      const load = loads[driver.id];
-
-      // 積載制限チェック
-      const maxVol   = Number(v.maxVol)   || 0;
-      const maxItems = Number(v.maxItems) || 0;
-      if (maxVol   > 0 && load.vol   + vol   > maxVol)   return; // 才数オーバー
-      if (maxItems > 0 && load.items + items > maxItems) return; // 個数オーバー
-
-      // スコア：現在の積載割合（均等に埋まるように）
-      const volRatio   = maxVol   > 0 ? load.vol   / maxVol   : load.vol   / 1000;
-      const itemsRatio = maxItems > 0 ? load.items / maxItems : load.items / 1000;
-
-      // 地理的距離：このドライバーが既に割り当てた配送先の重心からの距離
-      let distScore = 0;
-      const assigned = Object.entries(assignments)
-        .filter(([, a]) => a.driverId === driver.id)
-        .map(([idx]) => locations[parseInt(idx)]);
-
-      if (assigned.length > 0) {
-        const centerLat = assigned.reduce((s, l) => s + l.lat, 0) / assigned.length;
-        const centerLng = assigned.reduce((s, l) => s + l.lng, 0) / assigned.length;
-        const loc = locations[i];
-        distScore = Math.sqrt(
-          Math.pow(loc.lat - centerLat, 2) + Math.pow(loc.lng - centerLng, 2)
-        );
-      }
-
-      const score = (volRatio + itemsRatio) * 0.4 + distScore * 0.6;
-      if (score < bestScore) { bestScore = score; bestDriver = driver; }
-    });
-
-    if (bestDriver) {
-      assignments[i] = { driverId: bestDriver.id, bin: 1 };
-      loads[bestDriver.id].vol   += vol;
-      loads[bestDriver.id].items += items;
-    }
-    // 全ドライバーが満載の場合は未割当のまま
+  if (drivers.length===0) { alert('ドライバーを先に登録してください'); return; }
+  const sorted=locations.map((loc,i)=>({loc,i,items:Number(loc.items)||0})).sort((a,b)=>b.items-a.items);
+  const totals=drivers.map(()=>0); assignments={};
+  sorted.forEach(({i,items})=>{
+    const minIdx=totals.indexOf(Math.min(...totals));
+    assignments[i]={driverId:drivers[minIdx].id,bin:1}; totals[minIdx]+=items;
   });
-
-  // 結果サマリー
-  const assigned   = Object.keys(assignments).length;
-  const unassigned = locations.length - assigned;
-  let msg = `自動配車完了：${assigned}件割り当て`;
-  if (unassigned > 0) msg += `（${unassigned}件は積載超過のため未割当）`;
-  msg += '（手動で調整できます）';
-
-  renderAssignPanel();
-  document.getElementById('status').textContent = msg;
+  renderAssignPanel(); document.getElementById('status').textContent='自動振り分け完了（手動で調整できます）';
 }
 
 function applyAssign() {
