@@ -291,7 +291,7 @@
   <div id="assign-summary"></div>
   <div id="assign-content"></div>
   <div class="assign-actions">
-    <button class="btn-auto"       onclick="autoAssign()">⚡ 個数で自動振り分け</button>
+    <button class="btn-auto"       onclick="autoAssign()">⚡ 自動配車</button>
     <button class="btn-export-all" onclick="exportAllDrivers()">📥 全員分Excel出力</button>
     <button class="btn-apply"      onclick="applyAssign()">✅ 地図に反映</button>
     <button class="btn-cancel"     onclick="closeAllPanels()">閉じる</button>
@@ -1630,14 +1630,88 @@ function removeAssignment(locIdx) { delete assignments[locIdx]; renderAssignPane
 function assignToDriver(locIdx,driverId) { if(!driverId) return; assignments[locIdx]={driverId:parseInt(driverId)||driverId,bin:1}; renderAssignPanel(); }
 
 function autoAssign() {
-  if (drivers.length===0) { alert('ドライバーを先に登録してください'); return; }
-  const sorted=locations.map((loc,i)=>({loc,i,items:Number(loc.items)||0})).sort((a,b)=>b.items-a.items);
-  const totals=drivers.map(()=>0); assignments={};
-  sorted.forEach(({i,items})=>{
-    const minIdx=totals.indexOf(Math.min(...totals));
-    assignments[i]={driverId:drivers[minIdx].id,bin:1}; totals[minIdx]+=items;
+  if (drivers.length === 0) { alert('ドライバーを先に登録してください'); return; }
+
+  // 本日稼働中のドライバーのみ対象
+  const activeDrivers = drivers.filter(d => d.availableToday !== false);
+  if (activeDrivers.length === 0) { alert('本日稼働中のドライバーがいません'); return; }
+
+  // 車両情報をlocalStorageから取得（vehicles.htmlで登録したデータ）
+  let vehicles = [];
+  try { vehicles = JSON.parse(localStorage.getItem('haisha_vehicles') || '[]'); } catch(e) {}
+
+  // ドライバーごとの積載上限を取得（車両未設定の場合はデフォルト値）
+  const DEFAULT_MAX_VOL   = 9999;
+  const DEFAULT_MAX_ITEMS = 9999;
+  function getDriverLimits(driver) {
+    if (driver.vehicleId) {
+      const v = vehicles.find(v => String(v.id) === String(driver.vehicleId));
+      if (v) return { maxVol: Number(v.maxVol) || DEFAULT_MAX_VOL, maxItems: Number(v.maxItems) || DEFAULT_MAX_ITEMS };
+    }
+    return { maxVol: DEFAULT_MAX_VOL, maxItems: DEFAULT_MAX_ITEMS };
+  }
+
+  // 2点間の距離計算（km）
+  function calcDist(a, b) {
+    const R = 111;
+    const dlat = (b.lat - a.lat) * R;
+    const dlng = (b.lng - a.lng) * R * Math.cos((a.lat + b.lat) / 2 * Math.PI / 180);
+    return Math.sqrt(dlat * dlat + dlng * dlng);
+  }
+
+  assignments = {};
+
+  // 才数の多い順に並び替え（才数がない場合は個数で代替）
+  const sorted = locations
+    .map((loc, i) => ({ loc, i, vol: Number(loc.vol) || 0, items: Number(loc.items) || 0 }))
+    .sort((a, b) => b.vol !== a.vol ? b.vol - a.vol : b.items - a.items);
+
+  // 各ドライバーの現在の積載状況
+  const driverState = activeDrivers.map(d => {
+    const limits = getDriverLimits(d);
+    return { driver: d, usedVol: 0, usedItems: 0, maxVol: limits.maxVol, maxItems: limits.maxItems, assigned: [] };
   });
-  renderAssignPanel(); document.getElementById('status').textContent='自動振り分け完了（手動で調整できます）';
+
+  // 割り当てループ
+  sorted.forEach(({ loc, i, vol, items }) => {
+    // このlocを積める（積載上限内の）ドライバーを絞り込む
+    const capable = driverState.filter(s =>
+      s.usedVol + vol <= s.maxVol &&
+      s.usedItems + items <= s.maxItems
+    );
+    if (capable.length === 0) return; // 積めるドライバーなし → 未割当
+
+    // 既に割り当て済みの店舗の重心とこのlocとの距離でスコアを計算
+    // 割り当てが0件のドライバーはデポからの距離で判定
+    let best = null;
+    let bestScore = Infinity;
+    capable.forEach(s => {
+      let score;
+      if (s.assigned.length === 0) {
+        // まだ割り当てなし → デポからの距離
+        score = calcDist(DEPOT, loc);
+      } else {
+        // 重心（平均座標）からの距離
+        const avgLat = s.assigned.reduce((sum, l) => sum + l.lat, 0) / s.assigned.length;
+        const avgLng = s.assigned.reduce((sum, l) => sum + l.lng, 0) / s.assigned.length;
+        score = calcDist({ lat: avgLat, lng: avgLng }, loc);
+      }
+      if (score < bestScore) { bestScore = score; best = s; }
+    });
+
+    if (best) {
+      assignments[i] = { driverId: best.driver.id, bin: 1 };
+      best.usedVol   += vol;
+      best.usedItems += items;
+      best.assigned.push(loc);
+    }
+  });
+
+  const assignedCount   = Object.keys(assignments).length;
+  const unassignedCount = locations.length - assignedCount;
+  renderAssignPanel();
+  document.getElementById('status').textContent =
+    `自動配車完了：${assignedCount}件割当 / 未割当${unassignedCount}件（手動で調整できます）`;
 }
 
 function applyAssign() {
