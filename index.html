@@ -1640,13 +1640,13 @@ function autoAssign() {
   let vehicles = [];
   try { vehicles = JSON.parse(localStorage.getItem('haisha_vehicles') || '[]'); } catch(e) {}
 
-  // ドライバーごとの車両情報を取得
+  // ドライバーごとの車両情報を取得（drivers.htmlのvehicleIdで紐付け）
   function getVehicle(driver) {
-    // ドライバーに紐付いた車両を探す
-    const v = vehicles.find(v => String(v.driverId) === String(driver.id));
-    if (v) return v;
-    // 紐付きなし → 制限なし
-    return { maxVol: 0, maxItems: 0 };
+    if (driver.vehicleId) {
+      const v = vehicles.find(v => String(v.id) === String(driver.vehicleId));
+      if (v) return v;
+    }
+    return { maxVol: 0, maxItems: 0 }; // 車両未設定 → 制限なし
   }
 
   // 配送先を才数の多い順に並べる

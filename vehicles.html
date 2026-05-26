@@ -141,12 +141,6 @@
           </div>
         </div>
         <div class="form-group">
-          <label>担当ドライバー</label>
-          <select id="new-driver">
-            <option value="">-- 未割当 --</option>
-          </select>
-        </div>
-        <div class="form-group">
           <label>備考</label>
           <input type="text" id="new-note" placeholder="例：冷蔵対応、大型荷物不可など">
         </div>
@@ -173,19 +167,15 @@ function loadVehicles() {
 
   // ダミーデータ（初回のみ）
   vehicles = [
-    { id: 1, name: '2tトラックA', maxVol: 100, maxItems: 50, driverId: '', note: '標準車両' },
-    { id: 2, name: '2tトラックB', maxVol: 80,  maxItems: 40, driverId: '', note: '標準車両' },
-    { id: 3, name: '3tトラックC', maxVol: 120, maxItems: 60, driverId: '', note: '大型対応' },
+    { id: 1, name: '2tトラックA', maxVol: 100, maxItems: 50, note: '標準車両' },
+    { id: 2, name: '2tトラックB', maxVol: 80,  maxItems: 40, note: '標準車両' },
+    { id: 3, name: '3tトラックC', maxVol: 120, maxItems: 60, note: '大型対応' },
   ];
   saveVehicles();
 }
 
 function saveVehicles() {
   localStorage.setItem('haisha_vehicles', JSON.stringify(vehicles));
-}
-
-function loadDrivers() {
-  try { return JSON.parse(localStorage.getItem('haisha_drivers') || '[]'); } catch(e) { return []; }
 }
 
 // ===== 統計更新 =====
@@ -200,8 +190,6 @@ function updateStats() {
 // ===== 一覧描画 =====
 function renderList() {
   const el = document.getElementById('vehicle-list');
-  const drivers = loadDrivers();
-
   if (vehicles.length === 0) {
     el.innerHTML = '<div class="empty-msg">車両が登録されていません</div>';
     return;
@@ -209,9 +197,6 @@ function renderList() {
 
   el.innerHTML = '';
   vehicles.forEach(function(v) {
-    const driver = drivers.find(function(d) { return String(d.id) === String(v.driverId); });
-    const driverLabel = driver ? driver.name : '未割当';
-
     const row = document.createElement('div');
     row.className = 'vehicle-row';
     row.innerHTML =
@@ -220,7 +205,7 @@ function renderList() {
         '<span class="cap-badge">最大 ' + (v.maxVol   || '制限なし') + ' 才</span>' +
         '<span class="cap-badge">最大 ' + (v.maxItems || '制限なし') + ' 個</span>' +
       '</div>' +
-      '<div class="vehicle-driver">👤 担当：' + escHtml(driverLabel) + '</div>' +
+
       (v.note ? '<div class="vehicle-note">📝 ' + escHtml(v.note) + '</div>' : '') +
       '<div class="vehicle-actions">' +
         '<button class="btn-edit" onclick="editVehicle(' + v.id + ')">編集</button>' +
@@ -230,27 +215,11 @@ function renderList() {
   });
 }
 
-// ===== ドライバープルダウン更新 =====
-function updateDriverOptions(selectedId) {
-  const drivers = loadDrivers();
-  const sel = document.getElementById('new-driver');
-  const cur = selectedId !== undefined ? selectedId : sel.value;
-  sel.innerHTML = '<option value="">-- 未割当 --</option>';
-  drivers.forEach(function(d) {
-    const opt = document.createElement('option');
-    opt.value = d.id;
-    opt.textContent = d.name + (d.code ? ' (' + d.code + ')' : '');
-    if (String(d.id) === String(cur)) opt.selected = true;
-    sel.appendChild(opt);
-  });
-}
-
 // ===== 保存 =====
 function saveVehicle() {
   const name     = document.getElementById('new-name').value.trim();
   const maxVol   = parseFloat(document.getElementById('new-maxvol').value)   || 0;
   const maxItems = parseInt(document.getElementById('new-maxitems').value)   || 0;
-  const driverId = document.getElementById('new-driver').value;
   const note     = document.getElementById('new-note').value.trim();
 
   if (!name) { alert('車両名は必須です'); return; }
@@ -258,12 +227,12 @@ function saveVehicle() {
   const editId = document.getElementById('form-title').dataset.editId || '';
   if (editId) {
     const idx = vehicles.findIndex(function(v) { return String(v.id) === String(editId); });
-    if (idx >= 0) vehicles[idx] = Object.assign({}, vehicles[idx], { name, maxVol, maxItems, driverId, note });
+    if (idx >= 0) vehicles[idx] = Object.assign({}, vehicles[idx], { name, maxVol, maxItems, note });
     document.getElementById('form-title').textContent = '新規登録';
     document.getElementById('form-title').dataset.editId = '';
     showToast('更新しました');
   } else {
-    vehicles.push({ id: Date.now(), name, maxVol, maxItems, driverId, note });
+    vehicles.push({ id: Date.now(), name, maxVol, maxItems, note });
     showToast(name + ' を登録しました');
   }
   saveVehicles(); renderList(); updateStats(); clearForm();
@@ -277,7 +246,6 @@ function editVehicle(id) {
   document.getElementById('new-maxvol').value  = v.maxVol   || '';
   document.getElementById('new-maxitems').value= v.maxItems || '';
   document.getElementById('new-note').value    = v.note     || '';
-  updateDriverOptions(v.driverId || '');
   document.getElementById('form-title').textContent = '編集: ' + v.name;
   document.getElementById('form-title').dataset.editId = v.id;
   window.scrollTo(0, 0);
@@ -298,7 +266,6 @@ function clearForm() {
   document.getElementById('new-maxvol').value   = '';
   document.getElementById('new-maxitems').value = '';
   document.getElementById('new-note').value     = '';
-  updateDriverOptions('');
   document.getElementById('form-title').textContent = '新規登録';
   document.getElementById('form-title').dataset.editId = '';
 }
@@ -315,7 +282,6 @@ function showToast(msg) {
 
 // ===== 初期化 =====
 loadVehicles();
-updateDriverOptions('');
 renderList();
 updateStats();
 </script>
