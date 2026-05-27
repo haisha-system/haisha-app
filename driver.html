@@ -111,11 +111,62 @@
       padding: 10px 24px; border-radius: 20px; font-size: 13px;
       box-shadow: 0 2px 12px rgba(0,0,0,0.2); z-index: 999;
     }
+    /* ログイン画面 */
+    #login-screen {
+      min-height: 100vh;
+      background: #2c3e50;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 32px 24px;
+    }
+    .login-logo { font-size: 48px; margin-bottom: 16px; }
+    .login-title { color: white; font-size: 20px; margin-bottom: 6px; }
+    .login-desc  { color: #aee; font-size: 13px; margin-bottom: 32px; }
+    .login-box {
+      background: white; border-radius: 14px; padding: 28px 24px;
+      width: 100%; max-width: 320px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+    .login-box label { font-size: 13px; color: #555; display: block; margin-bottom: 6px; }
+    .login-box input {
+      width: 100%; padding: 13px 14px; border: 2px solid #ddd;
+      border-radius: 8px; font-size: 20px; font-family: sans-serif;
+      text-align: center; letter-spacing: 4px;
+      outline: none; transition: border-color 0.2s;
+    }
+    .login-box input:focus { border-color: #2c3e50; }
+    .login-btn {
+      width: 100%; margin-top: 16px; padding: 14px;
+      background: #2c3e50; color: white; border: none;
+      border-radius: 8px; font-size: 16px; font-weight: bold;
+      cursor: pointer; font-family: sans-serif;
+    }
+    .login-btn:active { background: #1a252f; }
+    .login-error { color: #e74c3c; font-size: 13px; margin-top: 10px; text-align: center; display: none; }
+    #logout-btn {
+      background: rgba(255,255,255,0.15); border: none; color: white;
+      padding: 5px 12px; border-radius: 6px; font-size: 12px;
+      cursor: pointer; font-family: sans-serif; float: right; margin-top: 2px;
+    }
   </style>
 </head>
 <body>
 
+<!-- ログイン画面 -->
+<div id="login-screen" style="display:none;">
+  <div class="login-logo">🚚</div>
+  <h2 class="login-title">配送確認</h2>
+  <p class="login-desc">社員コードを入力してください</p>
+  <div class="login-box">
+    <label>社員コード</label>
+    <input type="number" id="employee-code-input" placeholder="例：10001"
+           inputmode="numeric" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">ログイン</button>
+    <div class="login-error" id="login-error">社員コードが見つかりません</div>
+  </div>
+</div>
+
 <div id="header">
+  <button id="logout-btn" onclick="doLogout()" style="display:none;">ログアウト</button>
   <h1 id="header-title">🚚 配送確認</h1>
   <div class="sub" id="header-sub">読み込み中...</div>
 </div>
@@ -177,23 +228,81 @@ let deliveryId = null;
 let driverName = null;
 let driverColor = '#2c3e50';
 
-// URLパラメータ取得
-function getParams() {
-  const p = new URLSearchParams(window.location.search);
-  return { delivery: p.get('delivery'), driver: p.get('driver') };
+// ===== ログイン関連 =====
+const LOGIN_KEY = 'haisha_driver_login'; // localStorageのキー
+
+function showLoginScreen() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('header').style.display = 'none';
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('main-content').style.display = 'none';
+}
+
+function hideLoginScreen() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('header').style.display = 'block';
+  document.getElementById('logout-btn').style.display = 'inline-block';
+}
+
+async function doLogin() {
+  const code = document.getElementById('employee-code-input').value.trim();
+  if (!code) return;
+
+  const errorEl = document.getElementById('login-error');
+  errorEl.style.display = 'none';
+
+  // driversテーブルから社員コードで検索
+  let drivers = [];
+  try {
+    const d = localStorage.getItem('haisha_drivers');
+    if (d) drivers = JSON.parse(d);
+  } catch(e) {}
+
+  const matched = drivers.find(d => String(d.code || d.id) === String(code));
+  if (!matched) {
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  // ログイン情報を保存
+  localStorage.setItem(LOGIN_KEY, JSON.stringify({ code, name: matched.name }));
+  driverName = matched.name;
+  startApp();
+}
+
+function doLogout() {
+  if (!confirm('ログアウトしますか？')) return;
+  localStorage.removeItem(LOGIN_KEY);
+  location.reload();
 }
 
 // 初期化
 async function init() {
-  const { delivery, driver } = getParams();
-  if (!delivery || !driver) {
-    document.getElementById('loading').innerHTML = '<p style="color:#e74c3c;padding:40px 20px;text-align:center;">URLが正しくありません。<br>配車担当者からURLをもらってください。</p>';
-    return;
+  // 保存済みログイン確認
+  const saved = localStorage.getItem(LOGIN_KEY);
+  if (saved) {
+    try {
+      const { name } = JSON.parse(saved);
+      driverName = name;
+      hideLoginScreen();
+      startApp();
+      return;
+    } catch(e) {}
   }
-  deliveryId = delivery;
-  driverName = decodeURIComponent(driver);
+  // 未ログインならログイン画面を表示
+  showLoginScreen();
+}
 
+async function startApp() {
   document.getElementById('header-title').textContent = `🚚 ${driverName} の配送`;
+  document.getElementById('loading').style.display = 'block';
+
+  // 最新のdelivery_idを取得（最新の配車データ）
+  const { data: deliveries } = await sbClient
+    .from('deliveries').select('id').order('created_at', { ascending: false }).limit(1);
+  if (deliveries && deliveries.length > 0) {
+    deliveryId = deliveries[0].id;
+  }
 
   await loadStops();
   setupRealtime();
