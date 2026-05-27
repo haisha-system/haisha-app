@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>車両管理 | 配車管理システム</title>
+  <title>車種設定 | 配車管理システム</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -91,31 +91,23 @@
 <header>
   <button class="back-btn" onclick="location.href='menu.html'">← メニュー</button>
   <div>
-    <h1>🚛 車両管理</h1>
-    <p>車両ごとの最大積載量（才数・個数）を管理します</p>
+    <h1>🚛 車種設定</h1>
+    <p>車種ごとの最大積載量（才数・個数）を管理します</p>
   </div>
 </header>
 
 <main>
-  <div class="stats-row">
+  <div class="stats-row" style="grid-template-columns: 1fr;">
     <div class="stat-card">
-      <div class="stat-label">登録車両数</div>
-      <div class="stat-value" id="stat-total">0<span>台</span></div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">最大才数合計</div>
-      <div class="stat-value" id="stat-vol">0<span>才</span></div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">最大個数合計</div>
-      <div class="stat-value" id="stat-items">0<span>個</span></div>
+      <div class="stat-label">登録車種数</div>
+      <div class="stat-value" id="stat-total">0<span>種類</span></div>
     </div>
   </div>
 
   <div class="layout">
     <!-- 左：一覧 -->
     <div>
-      <div class="section-title">登録済み車両</div>
+      <div class="section-title">登録済み車種</div>
       <div class="vehicle-list" id="vehicle-list">
         <div class="empty-msg">車両が登録されていません</div>
       </div>
@@ -123,12 +115,12 @@
 
     <!-- 右：フォーム -->
     <div>
-      <div class="section-title">車両を追加・編集</div>
+      <div class="section-title">車種を追加・編集</div>
       <div class="add-form">
         <h3 id="form-title" data-edit-id="">新規登録</h3>
         <div class="form-group">
-          <label>車両名 *</label>
-          <input type="text" id="new-name" placeholder="例：2tトラックA">
+          <label>車種名 *</label>
+          <input type="text" id="new-name" placeholder="例：2tトラック">
         </div>
         <div class="form-row">
           <div class="form-group">
@@ -180,18 +172,14 @@ function saveVehicles() {
 
 // ===== 統計更新 =====
 function updateStats() {
-  document.getElementById('stat-total').innerHTML  = vehicles.length + '<span>台</span>';
-  const totalVol   = vehicles.reduce((s,v) => s + (Number(v.maxVol)   || 0), 0);
-  const totalItems = vehicles.reduce((s,v) => s + (Number(v.maxItems) || 0), 0);
-  document.getElementById('stat-vol').innerHTML   = totalVol   + '<span>才</span>';
-  document.getElementById('stat-items').innerHTML = totalItems + '<span>個</span>';
+  document.getElementById('stat-total').innerHTML = vehicles.length + '<span>種類</span>';
 }
 
 // ===== 一覧描画 =====
 function renderList() {
   const el = document.getElementById('vehicle-list');
   if (vehicles.length === 0) {
-    el.innerHTML = '<div class="empty-msg">車両が登録されていません</div>';
+    el.innerHTML = '<div class="empty-msg">車種が登録されていません</div>';
     return;
   }
 
@@ -222,7 +210,7 @@ function saveVehicle() {
   const maxItems = parseInt(document.getElementById('new-maxitems').value)   || 0;
   const note     = document.getElementById('new-note').value.trim();
 
-  if (!name) { alert('車両名は必須です'); return; }
+  if (!name) { alert('車種名は必須です'); return; }
 
   const editId = document.getElementById('form-title').dataset.editId || '';
   if (editId) {
