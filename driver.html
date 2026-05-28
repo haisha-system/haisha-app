@@ -328,15 +328,11 @@ async function loadStops() {
 
     if (delData) {
       const dateStr = delData.delivery_date;
-      const busho = delData.busho;
       const y=dateStr.slice(0,4), m=parseInt(dateStr.slice(4,6)), d=parseInt(dateStr.slice(6,8));
-      let date=new Date(parseInt(y),m-1,parseInt(d));
-      date.setDate(date.getDate()+1);
-      if(busho===1){if(date.getDay()===0)date.setDate(date.getDate()+1);}
-      else{if(date.getDay()===6)date.setDate(date.getDate()+2);if(date.getDay()===0)date.setDate(date.getDate()+1);}
+      const date=new Date(parseInt(y),m-1,parseInt(d));
       const youbi='日月火水木金土'[date.getDay()];
       document.getElementById('header-sub').textContent =
-        `配送日: ${date.getFullYear()}年${date.getMonth()+1}月${date.getDate()}日（${youbi}）`;
+        `配送日: ${y}年${parseInt(m)}月${parseInt(d)}日（${youbi}）`;
     }
 
     // 自分の配送先を取得
