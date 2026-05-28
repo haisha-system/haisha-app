@@ -303,22 +303,23 @@ function addDriver() {
   if (!code) { alert('社員コードは必須です'); return; }
 
   const editId = document.getElementById('form-title').dataset.editId || '';
+  let savedDriver = null;
   if (editId) {
     const idx = drivers.findIndex(d => String(d.id) === String(editId));
-    if (idx >= 0) drivers[idx] = { ...drivers[idx], name, code, depot, vehicle, vehicleId, phone, area, carrier, yoizumi, note };
+    if (idx >= 0) {
+      drivers[idx] = { ...drivers[idx], name, code, depot, vehicle, vehicleId, phone, area, carrier, yoizumi, note };
+      savedDriver = drivers[idx]; // ← editIdが消える前に取得
+    }
     document.getElementById('form-title').textContent = '新規登録';
     document.getElementById('form-title').dataset.editId = '';
     showToast('更新しました');
   } else {
     if (drivers.find(d => d.code === code)) { alert('この社員コードは既に使用されています'); return; }
-    drivers.push({ id: Date.now(), name, code, depot, vehicle, vehicleId, phone, area, carrier, yoizumi, note });
+    const newDriver = { id: Date.now(), name, code, depot, vehicle, vehicleId, phone, area, carrier, yoizumi, note };
+    drivers.push(newDriver);
+    savedDriver = newDriver; // ← 新規登録したドライバーを取得
     showToast(`${name} を登録しました`);
   }
-  // Supabase同期（clearFormの前にeditIdを取得）
-  const editId2 = document.getElementById('form-title').dataset.editId || '';
-  const savedDriver = editId2
-    ? drivers.find(d => String(d.id) === String(editId2))
-    : drivers[drivers.length - 1];
   if (savedDriver) syncDriverToSupabase(savedDriver);
   saveDrivers(); renderList(); clearForm();
 }
