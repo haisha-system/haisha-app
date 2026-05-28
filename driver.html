@@ -427,7 +427,11 @@ function renderStops() {
       ? new Date(stop.completed_at).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})
       : null;
 
-    const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(stop.address)}&travelmode=driving`;
+    // iOSはmaps://、AndroidはGoogleマップアプリを直接起動
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const navUrl = isIOS
+      ? `maps://?daddr=${encodeURIComponent(stop.address)}&dirflg=d`
+      : `google.navigation:q=${encodeURIComponent(stop.address)}`;
 
     card.innerHTML = `
       <div class="stop-card-header">
@@ -461,7 +465,16 @@ function renderStops() {
 }
 
 function navigate(url) {
-  window.open(url, '_blank');
+  // アプリURLスキームで起動、失敗したらWebで開く
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isAndroid = /android/i.test(navigator.userAgent);
+  if (isIOS || isAndroid) {
+    window.location.href = url;
+  } else {
+    // PCの場合はWebのGoogleマップを新タブで開く
+    const addr = decodeURIComponent(url.split('daddr=')[1] || url.split('q=')[1] || '');
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}&travelmode=driving`, '_blank');
+  }
 }
 
 async function markComplete(stopId) {
