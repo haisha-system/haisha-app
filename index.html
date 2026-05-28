@@ -877,7 +877,7 @@ function loadCSV(file) {
       // 列インデックスを取得
       const nameIdx  = headers.findIndex(h => h.includes('届け先名') || h.includes('顧客名称'));
       const addrIdx  = headers.findIndex(h => h.includes('届け先住所') || h.includes('顧客住所1'));
-      const itemIdx  = headers.findIndex(h => h === '出荷数' || h === '個数');
+      const itemIdx  = headers.findIndex(h => h.includes('ケースロケーション出荷数（ケース換算）') || h.includes('ケース換算') || h === '個数');
       const volIdx   = headers.findIndex(h => h === '明細才数' || h === '才数');
       const dateIdx  = headers.findIndex(h => h.includes('配送年月日') || h.includes('日付'));
       const codeIdx  = headers.findIndex(h => h.includes('届け先コード') || h.includes('顧客コード'));
