@@ -552,13 +552,17 @@ async function syncToSupabase(name) {
     if (delErr) throw delErr;
     currentDeliveryId = delData.id;
 
-    // delivery_stopsに全店舗を保存
+    // delivery_stopsに全店舗を保存（ドライバーごとに連番）
+    const driverOrderMap = {};
     const stops = locations.map((loc, i) => {
       const asgn = assignments[i];
       const driverIdx = asgn ? drivers.findIndex(d => d.id === asgn.driverId) : -1;
+      const driverKey = asgn ? String(asgn.driverId) : 'unassigned';
+      if (!driverOrderMap[driverKey]) driverOrderMap[driverKey] = 0;
+      driverOrderMap[driverKey]++;
       return {
         delivery_id: currentDeliveryId,
-        stop_order: i + 1,
+        stop_order: driverOrderMap[driverKey],
         name: loc.name,
         address: loc.addr,
         lat: loc.lat,
