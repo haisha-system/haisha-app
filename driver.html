@@ -272,6 +272,7 @@ async function doLogin() {
     // ログイン情報を保存
     localStorage.setItem(LOGIN_KEY, JSON.stringify({ code, name: data.name }));
     driverName = data.name;
+    hideLoginScreen();
     startApp();
   } catch(e) {
     document.querySelector('.login-btn').textContent = 'ログイン';
