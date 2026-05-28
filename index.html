@@ -532,7 +532,53 @@ function saveSnapshot() {
     if (list.length > 30) list = list.slice(0, 30);
   }
   localStorage.setItem('haisha_snapshots', JSON.stringify(list));
-  alert('「' + name + '」を保存しました');
+
+  // Supabaseにも同時に送信
+  syncToSupabase(name);
+}
+
+async function syncToSupabase(name) {
+  try {
+    // 既存データ削除
+    if (currentDeliveryId) {
+      await sbClient.from('deliveries').delete().eq('id', currentDeliveryId);
+    }
+
+    // deliveriesテーブルに保存
+    const { data: delData, error: delErr } = await sbClient
+      .from('deliveries')
+      .insert({ busho: currentBusho, delivery_date: currentDate })
+      .select().single();
+    if (delErr) throw delErr;
+    currentDeliveryId = delData.id;
+
+    // delivery_stopsに全店舗を保存
+    const stops = locations.map((loc, i) => {
+      const asgn = assignments[i];
+      const driverIdx = asgn ? drivers.findIndex(d => d.id === asgn.driverId) : -1;
+      return {
+        delivery_id: currentDeliveryId,
+        stop_order: i + 1,
+        name: loc.name,
+        address: loc.addr,
+        lat: loc.lat,
+        lng: loc.lng,
+        items: loc.items ? Number(loc.items) : null,
+        vol: loc.vol ? Number(loc.vol) : null,
+        driver_id: asgn ? String(asgn.driverId) : null,
+        driver_name: driverIdx >= 0 ? drivers[driverIdx].name : null,
+        bin: asgn ? asgn.bin : null,
+        status: 'pending'
+      };
+    });
+
+    const { error: stopsErr } = await sbClient.from('delivery_stops').insert(stops);
+    if (stopsErr) throw stopsErr;
+
+    document.getElementById('status').textContent = '「' + name + '」を保存しました（ドライバーに配信済み）';
+  } catch(err) {
+    document.getElementById('status').textContent = 'ローカル保存済み。Supabase送信エラー: ' + err.message;
+  }
 }
 
 function showSnapshotList() {
