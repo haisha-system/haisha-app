@@ -250,24 +250,35 @@ async function doLogin() {
 
   const errorEl = document.getElementById('login-error');
   errorEl.style.display = 'none';
+  document.querySelector('.login-btn').textContent = '確認中...';
+  document.querySelector('.login-btn').disabled = true;
 
-  // driversテーブルから社員コードで検索
-  let drivers = [];
   try {
-    const d = localStorage.getItem('haisha_drivers');
-    if (d) drivers = JSON.parse(d);
-  } catch(e) {}
+    // SupabaseのdriversテーブルからcodeでドライバーをDriver検索
+    const { data, error } = await sbClient
+      .from('drivers')
+      .select('code, name')
+      .eq('code', code)
+      .single();
 
-  const matched = drivers.find(d => String(d.code || d.id) === String(code));
-  if (!matched) {
+    document.querySelector('.login-btn').textContent = 'ログイン';
+    document.querySelector('.login-btn').disabled = false;
+
+    if (error || !data) {
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    // ログイン情報を保存
+    localStorage.setItem(LOGIN_KEY, JSON.stringify({ code, name: data.name }));
+    driverName = data.name;
+    startApp();
+  } catch(e) {
+    document.querySelector('.login-btn').textContent = 'ログイン';
+    document.querySelector('.login-btn').disabled = false;
+    errorEl.textContent = '通信エラーが発生しました';
     errorEl.style.display = 'block';
-    return;
   }
-
-  // ログイン情報を保存
-  localStorage.setItem(LOGIN_KEY, JSON.stringify({ code, name: matched.name }));
-  driverName = matched.name;
-  startApp();
 }
 
 function doLogout() {

@@ -82,6 +82,7 @@
     .empty-msg { font-size: 12px; color: rgba(255,255,255,0.3); padding: 12px 0; }
     @media(max-width:700px){ .layout{grid-template-columns:1fr;} .form-row{grid-template-columns:1fr;} .stats-row{grid-template-columns:repeat(3,1fr);} header{padding:16px 20px;} main{padding:16px 20px 100px;} }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <header>
@@ -174,6 +175,10 @@
 <div class="toast" id="toast"></div>
 
 <script>
+const SUPABASE_URL = 'https://hpycoozpspcxtesuzdpw.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_mRR0XWKLS8Zy7ivt8-OPeg_iWT3roQ9';
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 const DRIVER_COLORS = [
   '#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6',
   '#1abc9c','#e67e22','#34495e','#e91e63','#00bcd4',
@@ -189,6 +194,32 @@ function loadDrivers() {
   try { const d = localStorage.getItem('haisha_drivers'); if (d) drivers = JSON.parse(d); } catch(e) { drivers = []; }
 }
 function saveDrivers() { localStorage.setItem('haisha_drivers', JSON.stringify(drivers)); }
+
+// Supabaseにドライバー1件をupsert（登録・更新）
+async function syncDriverToSupabase(driver) {
+  try {
+    await sbClient.from('drivers').upsert({
+      id: driver.id,
+      code: driver.code || '',
+      name: driver.name || '',
+      depot: driver.depot || '',
+      vehicle: driver.vehicle || '',
+      vehicle_id: String(driver.vehicleId || ''),
+      phone: driver.phone || '',
+      area: driver.area || '',
+      carrier: String(driver.carrier || ''),
+      available_today: driver.availableToday !== false,
+      note: driver.note || ''
+    }, { onConflict: 'id' });
+  } catch(e) { console.error('Supabase sync error:', e); }
+}
+
+// Supabaseからドライバー1件を削除
+async function deleteDriverFromSupabase(id) {
+  try {
+    await sbClient.from('drivers').delete().eq('id', id);
+  } catch(e) { console.error('Supabase delete error:', e); }
+}
 
 function getSortKey(d) {
   const code = (d.code || 'zzz').toLowerCase();
@@ -283,6 +314,12 @@ function addDriver() {
     drivers.push({ id: Date.now(), name, code, depot, vehicle, vehicleId, phone, area, carrier, yoizumi, note });
     showToast(`${name} を登録しました`);
   }
+  // Supabase同期（clearFormの前にeditIdを取得）
+  const editId2 = document.getElementById('form-title').dataset.editId || '';
+  const savedDriver = editId2
+    ? drivers.find(d => String(d.id) === String(editId2))
+    : drivers[drivers.length - 1];
+  if (savedDriver) syncDriverToSupabase(savedDriver);
   saveDrivers(); renderList(); clearForm();
 }
 
@@ -307,6 +344,7 @@ function deleteDriver(id) {
   if (!d || !confirm(`「${d.name}」を削除しますか？`)) return;
   drivers = drivers.filter(x => x.id !== id);
   saveDrivers(); renderList(); showToast('削除しました');
+  deleteDriverFromSupabase(id);
 }
 
 function clearForm() {
@@ -326,11 +364,11 @@ function showToast(msg) {
 
 function toggleAvailable(id, val) {
   const d = drivers.find(x=>x.id===id);
-  if (d) { d.availableToday = val; saveDrivers(); updateStats(); renderList(); }
+  if (d) { d.availableToday = val; saveDrivers(); updateStats(); renderList(); syncDriverToSupabase(d); }
 }
 function toggleYoizumi(id, val) {
   const d = drivers.find(x=>x.id===id);
-  if (d) { d.yoizumiToday = val; saveDrivers(); renderList(); }
+  if (d) { d.yoizumiToday = val; saveDrivers(); renderList(); syncDriverToSupabase(d); }
 }
 function getCarrierName(id) {
   try {
