@@ -199,7 +199,6 @@ function saveDrivers() { localStorage.setItem('haisha_drivers', JSON.stringify(d
 async function syncDriverToSupabase(driver) {
   try {
     await sbClient.from('drivers').upsert({
-      id: driver.id,
       code: driver.code || '',
       name: driver.name || '',
       depot: driver.depot || '',
@@ -210,7 +209,7 @@ async function syncDriverToSupabase(driver) {
       carrier: String(driver.carrier || ''),
       available_today: driver.availableToday !== false,
       note: driver.note || ''
-    }, { onConflict: 'id' });
+    }, { onConflict: 'code' });
   } catch(e) { console.error('Supabase sync error:', e); }
 }
 
