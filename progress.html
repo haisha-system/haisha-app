@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>配送進捗確認</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: sans-serif; background: #f0f4f8; min-height: 100vh; }
+
+    #header {
+      background: #2c3e50; color: white;
+      padding: 14px 16px; position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    #header h1 { font-size: 16px; }
+    #header .sub { font-size: 12px; color: #aee; margin-top: 2px; }
+    #live-badge {
+      background: #27ae60; color: white; font-size: 11px; font-weight: bold;
+      padding: 3px 10px; border-radius: 20px; animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+    #summary-bar {
+      background: white; margin: 12px; border-radius: 10px;
+      padding: 12px 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+    }
+    .summary-item { text-align: center; }
+    .summary-item .val { font-size: 22px; font-weight: bold; color: #2c3e50; }
+    .summary-item .lbl { font-size: 11px; color: #888; margin-top: 2px; }
+
+    #driver-list { padding: 0 12px 80px; }
+
+    .driver-card {
+      background: white; border-radius: 12px; margin-bottom: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1); overflow: hidden;
+    }
+    .driver-card-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 16px 10px;
+    }
+    .driver-avatar {
+      width: 40px; height: 40px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: bold; font-size: 16px; color: white; flex-shrink: 0;
+    }
+    .driver-info { flex: 1; }
+    .driver-name { font-size: 15px; font-weight: bold; color: #1a1a1a; }
+    .driver-meta { font-size: 12px; color: #888; margin-top: 2px; }
+    .driver-counts {
+      text-align: right; flex-shrink: 0;
+    }
+    .count-done { font-size: 20px; font-weight: bold; color: #27ae60; }
+    .count-total { font-size: 13px; color: #888; }
+
+    .progress-bar-wrap {
+      padding: 0 16px 14px;
+    }
+    .progress-bar-bg {
+      background: #f0f0f0; border-radius: 6px; height: 8px; overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%; border-radius: 6px;
+      transition: width 0.5s ease;
+    }
+    .progress-label {
+      display: flex; justify-content: space-between;
+      font-size: 11px; color: #888; margin-top: 4px;
+    }
+
+    .stop-list { border-top: 1px solid #f0f0f0; }
+    .stop-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 16px; border-bottom: 1px solid #f8f8f8;
+      font-size: 13px;
+    }
+    .stop-item:last-child { border-bottom: none; }
+    .stop-status {
+      width: 20px; height: 20px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; flex-shrink: 0;
+    }
+    .stop-status.done { background: #27ae60; color: white; }
+    .stop-status.pending { background: #eee; color: #aaa; }
+    .stop-name { flex: 1; color: #333; }
+    .stop-time { font-size: 11px; color: #27ae60; flex-shrink: 0; }
+
+    .toggle-btn {
+      width: 100%; padding: 8px; border: none; background: #f8f8f8;
+      font-size: 12px; color: #888; cursor: pointer; border-top: 1px solid #f0f0f0;
+    }
+    .toggle-btn:hover { background: #f0f0f0; }
+
+    #loading { text-align: center; padding: 60px 20px; color: #888; font-size: 14px; }
+    #empty-msg { text-align: center; padding: 60px 20px; color: #888; font-size: 14px; }
+
+    .all-done-banner {
+      background: #27ae60; color: white; text-align: center;
+      padding: 12px; font-weight: bold; font-size: 14px; margin: 12px;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <div>
+    <h1>📊 配送進捗確認</h1>
+    <div class="sub" id="header-sub">読み込み中...</div>
+  </div>
+  <div id="live-badge">● LIVE</div>
+</div>
+
+<div id="summary-bar">
+  <div class="summary-item">
+    <div class="val" id="sum-drivers">-</div>
+    <div class="lbl">稼働人数</div>
+  </div>
+  <div class="summary-item">
+    <div class="val" id="sum-total">-</div>
+    <div class="lbl">総件数</div>
+  </div>
+  <div class="summary-item">
+    <div class="val" id="sum-done" style="color:#27ae60;">-</div>
+    <div class="lbl">完了</div>
+  </div>
+  <div class="summary-item">
+    <div class="val" id="sum-remain" style="color:#e74c3c;">-</div>
+    <div class="lbl">残り</div>
+  </div>
+</div>
+
+<div id="loading">読み込み中...</div>
+<div id="all-done" style="display:none;" class="all-done-banner">🎉 全件配送完了！</div>
+<div id="driver-list"></div>
+
+<script>
+const SUPABASE_URL = 'https://hpycoozpspcxtesuzdpw.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_mRR0XWKLS8Zy7ivt8-OPeg_iWT3roQ9';
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const COLORS = [
+  '#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6',
+  '#1abc9c','#e67e22','#34495e','#e91e63','#00bcd4'
+];
+
+let deliveryId = null;
+let allStops = [];
+let expandedDrivers = {};
+
+async function init() {
+  // 最新の配車データを取得
+  const { data: deliveries } = await sbClient
+    .from('deliveries').select('*').order('created_at', { ascending: false }).limit(1);
+
+  if (!deliveries || deliveries.length === 0) {
+    document.getElementById('loading').textContent = '配車データがありません';
+    return;
+  }
+
+  const del = deliveries[0];
+  deliveryId = del.id;
+
+  const dateStr = del.delivery_date || '';
+  if (dateStr.length === 8) {
+    const y = dateStr.slice(0,4), m = parseInt(dateStr.slice(4,6)), d = parseInt(dateStr.slice(6,8));
+    const youbi = '日月火水木金土'[new Date(parseInt(y),m-1,d).getDay()];
+    document.getElementById('header-sub').textContent = `${y}年${m}月${d}日（${youbi}）`;
+  }
+
+  await loadStops();
+  setupRealtime();
+}
+
+async function loadStops() {
+  const { data, error } = await sbClient
+    .from('delivery_stops')
+    .select('*')
+    .eq('delivery_id', deliveryId)
+    .order('stop_order');
+
+  if (error) {
+    document.getElementById('loading').textContent = 'エラー: ' + error.message;
+    return;
+  }
+
+  allStops = (data || []).filter(s => s.driver_name);
+  document.getElementById('loading').style.display = 'none';
+  render();
+}
+
+function render() {
+  // ドライバーごとにグループ化
+  const driverMap = {};
+  allStops.forEach(stop => {
+    const name = stop.driver_name;
+    if (!driverMap[name]) driverMap[name] = { name, stops: [] };
+    driverMap[name].stops.push(stop);
+  });
+
+  const drivers = Object.values(driverMap).sort((a,b) => a.name.localeCompare(b.name));
+
+  // サマリー更新
+  const total = allStops.length;
+  const done = allStops.filter(s => s.status === 'completed').length;
+  document.getElementById('sum-drivers').textContent = drivers.length;
+  document.getElementById('sum-total').textContent = total;
+  document.getElementById('sum-done').textContent = done;
+  document.getElementById('sum-remain').textContent = total - done;
+
+  // 全完了バナー
+  document.getElementById('all-done').style.display = (total > 0 && done === total) ? 'block' : 'none';
+
+  const list = document.getElementById('driver-list');
+  list.innerHTML = '';
+
+  drivers.forEach((driver, idx) => {
+    const color = COLORS[idx % COLORS.length];
+    const initial = driver.name.slice(-1) || '?';
+    const doneCount = driver.stops.filter(s => s.status === 'completed').length;
+    const total = driver.stops.length;
+    const pct = total > 0 ? Math.round(doneCount / total * 100) : 0;
+    const isExpanded = expandedDrivers[driver.name] || false;
+
+    const card = document.createElement('div');
+    card.className = 'driver-card';
+
+    // 停車リストHTML
+    const stopsHtml = driver.stops.map(stop => {
+      const isDone = stop.status === 'completed';
+      const time = isDone && stop.completed_at
+        ? new Date(stop.completed_at).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})
+        : null;
+      return `<div class="stop-item">
+        <div class="stop-status ${isDone ? 'done' : 'pending'}">${isDone ? '✓' : stop.stop_order}</div>
+        <div class="stop-name">${stop.name}</div>
+        ${time ? `<div class="stop-time">${time}</div>` : ''}
+      </div>`;
+    }).join('');
+
+    card.innerHTML = `
+      <div class="driver-card-header">
+        <div class="driver-avatar" style="background:${color}">${initial}</div>
+        <div class="driver-info">
+          <div class="driver-name">${driver.name}</div>
+          <div class="driver-meta">${total}件 / ${driver.stops.reduce((s,x)=>s+(Number(x.items)||0),0)}個</div>
+        </div>
+        <div class="driver-counts">
+          <div class="count-done">${doneCount}</div>
+          <div class="count-total">/ ${total}件</div>
+        </div>
+      </div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" style="width:${pct}%;background:${color};"></div>
+        </div>
+        <div class="progress-label">
+          <span>完了率 ${pct}%</span>
+          <span>残り ${total - doneCount}件</span>
+        </div>
+      </div>
+      <div class="stop-list" style="display:${isExpanded ? 'block' : 'none'}">
+        ${stopsHtml}
+      </div>
+      <button class="toggle-btn" onclick="toggleDriver('${driver.name}')">
+        ${isExpanded ? '▲ 閉じる' : '▼ 配送先を見る（' + total + '件）'}
+      </button>
+    `;
+    list.appendChild(card);
+  });
+}
+
+function toggleDriver(name) {
+  expandedDrivers[name] = !expandedDrivers[name];
+  render();
+}
+
+function setupRealtime() {
+  sbClient.channel('progress-changes')
+    .on('postgres_changes', {
+      event: 'UPDATE', schema: 'public', table: 'delivery_stops',
+      filter: `delivery_id=eq.${deliveryId}`
+    }, payload => {
+      const idx = allStops.findIndex(s => s.id === payload.new.id);
+      if (idx >= 0) allStops[idx] = payload.new;
+      render();
+    })
+    .subscribe();
+}
+
+init();
+</script>
+</body>
+</html>
