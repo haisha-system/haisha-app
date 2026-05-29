@@ -259,7 +259,7 @@ function renderList() {
   // 検索
   if (q) {
     entries = entries.filter(([code, s]) =>
-      code.includes(q) || s.name.toLowerCase().includes(q) || s.addr.toLowerCase().includes(q)
+      code.includes(q) || s.name.toLowerCase().includes(q) || s.addr.toLowerCase().includes(q) || (s.course||'').includes(q)
     );
   }
 
@@ -291,6 +291,7 @@ function renderList() {
         <div class="store-code">${code}</div>
         <div class="store-name">${store.name}</div>
         <div class="store-addr">${store.addr}</div>
+        ${store.course ? `<div style="font-size:10px;color:#f59e0b;margin-top:2px;">🛣 コース${store.course}</div>` : ''}
       </div>
       <span class="store-badge ${badgeClass}">${badgeText}</span>
     `;
@@ -316,7 +317,7 @@ function renderEditPanel(code) {
 
   document.getElementById('right-content').innerHTML = `
     <div class="edit-form">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
         <div class="form-group">
           <label>届け先コード</label>
           <input type="text" value="${code}" readonly>
@@ -324,6 +325,10 @@ function renderEditPanel(code) {
         <div class="form-group">
           <label>店舗名</label>
           <input type="text" id="edit-name" value="${store.name}">
+        </div>
+        <div class="form-group">
+          <label>配送コース</label>
+          <input type="text" id="edit-course" value="${store.course || ''}" placeholder="例：01">
         </div>
       </div>
       <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;margin-bottom:8px;">
@@ -471,12 +476,13 @@ function saveCurrentStore() {
   const lng = parseFloat(document.getElementById('edit-lng').value);
   const name = document.getElementById('edit-name').value.trim();
   const addr = document.getElementById('edit-addr').value.trim();
+  const course = document.getElementById('edit-course') ? document.getElementById('edit-course').value.trim() : (stores[currentCode].course || '');
 
   if (!name || !addr) { showToast('店舗名と住所は必須です', true); return; }
 
   stores[currentCode] = {
     ...stores[currentCode],
-    name, addr,
+    name, addr, course,
     customLat: isNaN(lat) ? null : lat,
     customLng: isNaN(lng) ? null : lng,
     hasCustom: !isNaN(lat) && !isNaN(lng)

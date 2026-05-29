@@ -930,7 +930,8 @@ function loadCSV(file) {
       const itemIdx  = headers.findIndex(h => h.includes('ケースロケーション出荷数（ケース換算）') || h.includes('ケース換算') || h === '個数');
       const volIdx   = headers.findIndex(h => h === '明細才数' || h === '才数');
       const dateIdx  = headers.findIndex(h => h.includes('配送年月日') || h.includes('日付'));
-      const codeIdx  = headers.findIndex(h => h.includes('届け先コード') || h.includes('顧客コード'));
+      const codeIdx   = headers.findIndex(h => h.includes('届け先コード') || h.includes('顧客コード'));
+      const courseIdx = headers.findIndex(h => h === '配送コース' || h.includes('配送コース'));
 
       if (nameIdx < 0 || addrIdx < 0) {
         document.getElementById('status').textContent = '届け先名・住所の列が見つかりません';
@@ -950,12 +951,13 @@ function loadCSV(file) {
         const addr = cols[addrIdx] || '';
         const items = parseFloat(cols[itemIdx]) || 0;
         const vol   = parseFloat(cols[volIdx])   || 0;
+        const course = courseIdx >= 0 ? (cols[courseIdx] || '').trim() : '';
         const depotCode = depotCodeIdx >= 0 ? (cols[depotCodeIdx]||'').trim() : '';
 
         if (!name.trim() || !addr.trim()) return;
 
         if (!shopMap.has(code)) {
-          shopMap.set(code, { name: name.trim(), addr: addr.trim(), items: 0, vol: 0, depotCode });
+          shopMap.set(code, { name: name.trim(), addr: addr.trim(), items: 0, vol: 0, depotCode, course: course || '' });
         }
         const shop = shopMap.get(code);
         shop.items += items;
@@ -1049,6 +1051,7 @@ function loadCSV(file) {
           }
           savedStores[shop.code].name = shop.name;
           savedStores[shop.code].addr = shop.addr;
+          if (shop.course) savedStores[shop.code].course = shop.course;
         });
         try { localStorage.setItem('haisha_stores', JSON.stringify(savedStores)); } catch(e) {}
 
@@ -1063,7 +1066,7 @@ function loadCSV(file) {
           const c = (lat && lng) ? { lat, lng } : null;
           if (!c) return;
           const loc = {
-            name: shop.name, addr: shop.addr,
+            name: shop.name, addr: shop.addr, course: shop.course || '',
             lat: c.lat, lng: c.lng,
             items: shop.items, vol: parseFloat(shop.vol.toFixed(3)),
             code: shop.code,
@@ -1724,28 +1727,37 @@ function autoAssign() {
 
   // 割り当てループ
   sorted.forEach(({ loc, i, vol, items }) => {
+    const locCourse = (loc.course || '').trim();
+
     // このlocを積める（積載上限内の）ドライバーを絞り込む
-    const capable = driverState.filter(s =>
+    let capable = driverState.filter(s =>
       s.usedVol + vol <= s.maxVol &&
       s.usedItems + items <= s.maxItems
     );
     if (capable.length === 0) return; // 積めるドライバーなし → 未割当
 
-    // 既に割り当て済みの店舗の重心とこのlocとの距離でスコアを計算
-    // 割り当てが0件のドライバーはデポからの距離で判定
+    // コースが一致するドライバーを優先（担当コースが設定されている場合）
+    const courseMatch = capable.filter(s => {
+      if (!s.driver.courses || s.driver.courses.length === 0) return false;
+      return s.driver.courses.includes(locCourse);
+    });
+    const candidates = courseMatch.length > 0 ? courseMatch : capable;
+
+    // スコア計算：コース一致ボーナス + 地理的距離
     let best = null;
     let bestScore = Infinity;
-    capable.forEach(s => {
+    candidates.forEach(s => {
       let score;
       if (s.assigned.length === 0) {
-        // まだ割り当てなし → デポからの距離
         score = calcDist(DEPOT, loc);
       } else {
-        // 重心（平均座標）からの距離
         const avgLat = s.assigned.reduce((sum, l) => sum + l.lat, 0) / s.assigned.length;
         const avgLng = s.assigned.reduce((sum, l) => sum + l.lng, 0) / s.assigned.length;
         score = calcDist({ lat: avgLat, lng: avgLng }, loc);
       }
+      // コース一致ボーナス（距離スコアを0.5倍に圧縮して優先）
+      const hasCourseMatch = s.driver.courses && s.driver.courses.includes(locCourse);
+      if (hasCourseMatch) score *= 0.5;
       if (score < bestScore) { bestScore = score; best = s; }
     });
 
