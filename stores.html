@@ -190,6 +190,11 @@
       <button class="filter-btn" onclick="setFilter('nocoord', this)">要確認</button>
       <button class="filter-btn" onclick="setFilter('auto', this)">自動</button>
     </div>
+    <div class="filter-bar" style="margin-top:6px;flex-wrap:wrap;gap:4px;">
+      <button class="filter-btn active" id="depot-all-btn" onclick="setDepotFilter('', this)">デポ:すべて</button>
+      <button class="filter-btn" onclick="setDepotFilter('2806', this)">🏭 神戸西</button>
+      <button class="filter-btn" onclick="setDepotFilter('2805', this)">🏭 丹波</button>
+    </div>
     <div class="filter-bar" id="course-filter-bar" style="margin-top:6px;flex-wrap:wrap;gap:4px;"></div>
     <div class="store-list" id="store-list"></div>
   </div>
@@ -220,7 +225,8 @@ const STORAGE_KEY = 'haisha_stores'; // { [code]: { name, addr, lat, lng, custom
 let stores = {};      // 全店舗データ
 let currentCode = null; // 選択中のコード
 let currentFilter = 'all';
-let currentCourseFilter = ''; // '' = すべて, '00' = コース00のみ
+let currentCourseFilter = '';
+let currentDepotFilter = '';
 let editMap = null;
 let editMarker = null;
 
@@ -243,6 +249,17 @@ function saveStores() {
 function setFilter(f, btn) {
   currentFilter = f;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderList();
+}
+
+function setDepotFilter(depot, btn) {
+  currentDepotFilter = depot;
+  document.querySelectorAll('.filter-bar .filter-btn').forEach(b => {
+    if (b.id === 'depot-all-btn' || b.getAttribute('onclick') && b.getAttribute('onclick').includes('setDepotFilter')) {
+      b.classList.remove('active');
+    }
+  });
   btn.classList.add('active');
   renderList();
 }
@@ -295,6 +312,7 @@ function renderList() {
   if (currentFilter === 'nocoord') entries = entries.filter(([,s]) => !s.lat && !s.customLat);
   if (currentFilter === 'auto')    entries = entries.filter(([,s]) => !s.hasCustom && (s.lat || s.customLat));
   if (currentCourseFilter) entries = entries.filter(([,s]) => (s.course||'').trim() === currentCourseFilter);
+  if (currentDepotFilter) entries = entries.filter(([,s]) => (s.depot||'') === currentDepotFilter);
 
   // 検索
   if (q) {
@@ -331,7 +349,10 @@ function renderList() {
         <div class="store-code">${code}</div>
         <div class="store-name">${store.name}</div>
         <div class="store-addr">${store.addr}</div>
-        ${store.course ? `<div style="font-size:10px;color:#f59e0b;margin-top:2px;">🛣 コース${store.course}</div>` : ''}
+        <div style="display:flex;gap:6px;margin-top:2px;flex-wrap:wrap;">
+          ${store.course ? `<span style="font-size:10px;color:#f59e0b;">🛣 コース${store.course}</span>` : ''}
+          ${store.depot==='2806' ? `<span style="font-size:10px;color:#06b6d4;">🏭 神戸西</span>` : store.depot==='2805' ? `<span style="font-size:10px;color:#a78bfa;">🏭 丹波</span>` : ''}
+        </div>
       </div>
       <span class="store-badge ${badgeClass}">${badgeText}</span>
     `;
@@ -369,6 +390,16 @@ function renderEditPanel(code) {
         <div class="form-group">
           <label>配送コース</label>
           <input type="text" id="edit-course" value="${store.course || ''}" placeholder="例：01">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:8px;">
+        <div class="form-group">
+          <label>担当デポ</label>
+          <select id="edit-depot" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:white;border-radius:6px;padding:8px 12px;font-size:13px;font-family:inherit;">
+            <option value="" ${!store.depot ? 'selected' : ''}>-- 未設定 --</option>
+            <option value="2806" ${store.depot==='2806' ? 'selected' : ''}>神戸西デポ（2806）</option>
+            <option value="2805" ${store.depot==='2805' ? 'selected' : ''}>丹波デポ（2805）</option>
+          </select>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;margin-bottom:8px;">
@@ -517,18 +548,20 @@ function saveCurrentStore() {
   const name = document.getElementById('edit-name').value.trim();
   const addr = document.getElementById('edit-addr').value.trim();
   const course = document.getElementById('edit-course') ? document.getElementById('edit-course').value.trim() : (stores[currentCode].course || '');
+  const depot = document.getElementById('edit-depot') ? document.getElementById('edit-depot').value : (stores[currentCode].depot || '');
 
   if (!name || !addr) { showToast('店舗名と住所は必須です', true); return; }
 
   stores[currentCode] = {
     ...stores[currentCode],
-    name, addr, course,
+    name, addr, course, depot,
     customLat: isNaN(lat) ? null : lat,
     customLng: isNaN(lng) ? null : lng,
     hasCustom: !isNaN(lat) && !isNaN(lng)
   };
   saveStores();
   renderList();
+  renderCourseFilterBar();
   showToast('保存しました ✅');
 }
 

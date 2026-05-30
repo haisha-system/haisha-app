@@ -188,6 +188,41 @@ const SUPABASE_URL = 'https://hpycoozpspcxtesuzdpw.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_mRR0XWKLS8Zy7ivt8-OPeg_iWT3roQ9';
 const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+let courseMap = {};
+
+function loadCourseMap() {
+  try { courseMap = JSON.parse(localStorage.getItem('haisha_courses') || '{}'); } catch(e) { courseMap = {}; }
+}
+
+function renderCourseCheckboxes(selectedCourses) {
+  loadCourseMap();
+  const wrap = document.getElementById('courses-checkboxes');
+  if (!wrap) return;
+  const nums = Object.keys(courseMap).sort();
+  if (nums.length === 0) {
+    wrap.innerHTML = '<span style="color:rgba(255,255,255,0.3);font-size:12px;">courses.htmlでコースを登録してください</span>';
+    return;
+  }
+  wrap.innerHTML = '';
+  nums.forEach(num => {
+    const checked = selectedCourses && selectedCourses.includes(num);
+    const name = courseMap[num] ? num + ' ' + courseMap[num] : num;
+    const item = document.createElement('label');
+    item.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;white-space:nowrap;padding:2px 4px;background:rgba(255,255,255,0.05);border-radius:4px;';
+    item.innerHTML = `<input type="checkbox" value="${num}" ${checked ? 'checked' : ''}
+      onchange="updateCoursesHidden()" style="cursor:pointer;"> ${name}`;
+    wrap.appendChild(item);
+  });
+  updateCoursesHidden();
+}
+
+function updateCoursesHidden() {
+  const checked = [...document.querySelectorAll('#courses-checkboxes input[type=checkbox]:checked')]
+    .map(cb => cb.value);
+  const hidden = document.getElementById('new-courses');
+  if (hidden) hidden.value = checked.join(',');
+}
+
 const DRIVER_COLORS = [
   '#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6',
   '#1abc9c','#e67e22','#34495e','#e91e63','#00bcd4',
@@ -433,10 +468,12 @@ function updateVehicleOptions(selectedId) {
     sel.appendChild(opt);
   });
 }
+loadCourseMap();
 loadDrivers();
 updateCarrierOptions();
 updateVehicleOptions('');
 renderList();
+setTimeout(() => renderCourseCheckboxes([]), 0);
 </script>
 </body>
 </html>
