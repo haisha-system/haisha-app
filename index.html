@@ -1051,7 +1051,7 @@ function loadCSV(file) {
           }
           savedStores[shop.code].name = shop.name;
           savedStores[shop.code].addr = shop.addr;
-          if (shop.course) savedStores[shop.code].course = shop.course;
+          savedStores[shop.code].course = shop.course || savedStores[shop.code].course || '';
         });
         try { localStorage.setItem('haisha_stores', JSON.stringify(savedStores)); } catch(e) {}
 

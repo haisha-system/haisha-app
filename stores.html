@@ -190,6 +190,7 @@
       <button class="filter-btn" onclick="setFilter('nocoord', this)">要確認</button>
       <button class="filter-btn" onclick="setFilter('auto', this)">自動</button>
     </div>
+    <div class="filter-bar" id="course-filter-bar" style="margin-top:6px;flex-wrap:wrap;gap:4px;"></div>
     <div class="store-list" id="store-list"></div>
   </div>
 
@@ -219,6 +220,7 @@ const STORAGE_KEY = 'haisha_stores'; // { [code]: { name, addr, lat, lng, custom
 let stores = {};      // 全店舗データ
 let currentCode = null; // 選択中のコード
 let currentFilter = 'all';
+let currentCourseFilter = ''; // '' = すべて, '00' = コース00のみ
 let editMap = null;
 let editMarker = null;
 
@@ -245,6 +247,43 @@ function setFilter(f, btn) {
   renderList();
 }
 
+function setCourseFilter(course, btn) {
+  currentCourseFilter = course;
+  document.querySelectorAll('#course-filter-bar .course-filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderList();
+}
+
+function renderCourseFilterBar() {
+  const bar = document.getElementById('course-filter-bar');
+  if (!bar) return;
+  // ストアからコース一覧を取得
+  const courses = new Set();
+  Object.values(stores).forEach(s => { if (s.course && s.course.trim()) courses.add(s.course.trim()); });
+  // courses.htmlのラベルを取得
+  let courseMap = {};
+  try { courseMap = JSON.parse(localStorage.getItem('haisha_courses') || '{}'); } catch(e) {}
+
+  const nums = [...courses].sort();
+  bar.innerHTML = '';
+  if (nums.length === 0) return;
+
+  const allBtn = document.createElement('button');
+  allBtn.className = 'course-filter-btn filter-btn active';
+  allBtn.textContent = 'コース:すべて';
+  allBtn.onclick = function() { setCourseFilter('', this); };
+  bar.appendChild(allBtn);
+
+  nums.forEach(num => {
+    const label = courseMap[num] ? num + ' ' + courseMap[num] : 'コース' + num;
+    const btn = document.createElement('button');
+    btn.className = 'course-filter-btn filter-btn';
+    btn.textContent = label;
+    btn.onclick = function() { setCourseFilter(num, this); };
+    bar.appendChild(btn);
+  });
+}
+
 function renderList() {
   const q = document.getElementById('search-input').value.toLowerCase();
   const list = document.getElementById('store-list');
@@ -255,6 +294,7 @@ function renderList() {
   if (currentFilter === 'custom')  entries = entries.filter(([,s]) => s.hasCustom);
   if (currentFilter === 'nocoord') entries = entries.filter(([,s]) => !s.lat && !s.customLat);
   if (currentFilter === 'auto')    entries = entries.filter(([,s]) => !s.hasCustom && (s.lat || s.customLat));
+  if (currentCourseFilter) entries = entries.filter(([,s]) => (s.course||'').trim() === currentCourseFilter);
 
   // 検索
   if (q) {
@@ -520,6 +560,7 @@ function showToast(msg, isError = false) {
 // 初期化
 // ====================================================
 loadStores();
+renderCourseFilterBar();
 renderList();
 </script>
 </body>
