@@ -159,15 +159,24 @@
           </div>
         </div>
         <div class="form-group">
-          <label>担当コース</label>
-          <div id="courses-checkboxes" style="
+          <label>担当コース（1便）</label>
+          <div id="courses-checkboxes-bin1" style="
             background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);
-            border-radius:6px; padding:8px 10px; max-height:120px; overflow-y:auto;
+            border-radius:6px; padding:8px 10px; max-height:100px; overflow-y:auto;
+            display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;
+          ">
+            <span style="color:rgba(255,255,255,0.3);font-size:12px;">読み込み中...</span>
+          </div>
+          <label>担当コース（2便）</label>
+          <div id="courses-checkboxes-bin2" style="
+            background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);
+            border-radius:6px; padding:8px 10px; max-height:100px; overflow-y:auto;
             display:flex; flex-wrap:wrap; gap:6px;
           ">
             <span style="color:rgba(255,255,255,0.3);font-size:12px;">読み込み中...</span>
           </div>
           <input type="hidden" id="new-courses" value="">
+          <input type="hidden" id="new-courses-bin2" value="">
           <label>備考</label>
           <input type="text" id="new-note" placeholder="メモ">
         </div>
@@ -194,33 +203,37 @@ function loadCourseMap() {
   try { courseMap = JSON.parse(localStorage.getItem('haisha_courses') || '{}'); } catch(e) { courseMap = {}; }
 }
 
-function renderCourseCheckboxes(selectedCourses) {
+function renderCourseCheckboxes(selectedCourses, selectedCoursesBin2) {
   loadCourseMap();
-  const wrap = document.getElementById('courses-checkboxes');
-  if (!wrap) return;
   const nums = Object.keys(courseMap).sort();
-  if (nums.length === 0) {
-    wrap.innerHTML = '<span style="color:rgba(255,255,255,0.3);font-size:12px;">courses.htmlでコースを登録してください</span>';
-    return;
-  }
-  wrap.innerHTML = '';
-  nums.forEach(num => {
-    const checked = selectedCourses && selectedCourses.includes(num);
-    const name = courseMap[num] ? num + ' ' + courseMap[num] : num;
-    const item = document.createElement('label');
-    item.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;white-space:nowrap;padding:2px 4px;background:rgba(255,255,255,0.05);border-radius:4px;';
-    item.innerHTML = `<input type="checkbox" value="${num}" ${checked ? 'checked' : ''}
-      onchange="updateCoursesHidden()" style="cursor:pointer;"> ${name}`;
-    wrap.appendChild(item);
+  const emptyMsg = '<span style="color:rgba(255,255,255,0.3);font-size:12px;">courses.htmlでコースを登録してください</span>';
+
+  ['bin1','bin2'].forEach(bin => {
+    const wrap = document.getElementById('courses-checkboxes-' + bin);
+    if (!wrap) return;
+    if (nums.length === 0) { wrap.innerHTML = emptyMsg; return; }
+    const selected = bin === 'bin1' ? (selectedCourses || []) : (selectedCoursesBin2 || []);
+    wrap.innerHTML = '';
+    nums.forEach(num => {
+      const checked = selected.includes(num);
+      const name = courseMap[num] ? num + ' ' + courseMap[num] : num;
+      const item = document.createElement('label');
+      item.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;white-space:nowrap;padding:2px 4px;background:rgba(255,255,255,0.05);border-radius:4px;';
+      item.innerHTML = `<input type="checkbox" value="${num}" ${checked ? 'checked' : ''}
+        onchange="updateCoursesHidden()" style="cursor:pointer;"> ${name}`;
+      wrap.appendChild(item);
+    });
   });
   updateCoursesHidden();
 }
 
 function updateCoursesHidden() {
-  const checked = [...document.querySelectorAll('#courses-checkboxes input[type=checkbox]:checked')]
-    .map(cb => cb.value);
-  const hidden = document.getElementById('new-courses');
-  if (hidden) hidden.value = checked.join(',');
+  const checked1 = [...document.querySelectorAll('#courses-checkboxes-bin1 input[type=checkbox]:checked')].map(cb => cb.value);
+  const checked2 = [...document.querySelectorAll('#courses-checkboxes-bin2 input[type=checkbox]:checked')].map(cb => cb.value);
+  const h1 = document.getElementById('new-courses');
+  const h2 = document.getElementById('new-courses-bin2');
+  if (h1) h1.value = checked1.join(',');
+  if (h2) h2.value = checked2.join(',');
 }
 
 const DRIVER_COLORS = [
@@ -251,6 +264,7 @@ async function syncDriverToSupabase(driver) {
       phone: driver.phone || '',
       area: driver.area || '',
       courses: driver.courses ? driver.courses.join(',') : '',
+      courses_bin2: driver.coursesBin2 ? driver.coursesBin2.join(',') : '',
       carrier: String(driver.carrier || ''),
       available_today: driver.availableToday !== false,
       note: driver.note || ''
@@ -300,7 +314,11 @@ function renderList() {
     if (d.area)    line2parts.push('📍'+d.area);
     if (d.courses && d.courses.length > 0) {
       const labels = d.courses.map(c => courseMap[c] ? courseMap[c] : c);
-      line2parts.push('🛣'+labels.join('・'));
+      line2parts.push('1便:'+labels.join('・'));
+    }
+    if (d.coursesBin2 && d.coursesBin2.length > 0) {
+      const labels2 = d.coursesBin2.map(c => courseMap[c] ? courseMap[c] : c);
+      line2parts.push('2便:'+labels2.join('・'));
     }
     if (d.phone)   line2parts.push('📞'+d.phone);
     if (d.note)    line2parts.push(d.note);
@@ -346,6 +364,8 @@ function addDriver() {
   const area    = document.getElementById('new-area').value.trim();
   const coursesRaw = (document.getElementById('new-courses').value || '').trim();
   const courses = coursesRaw ? coursesRaw.split(',').map(c => c.trim()).filter(Boolean) : [];
+  const coursesBin2Raw = (document.getElementById('new-courses-bin2') ? document.getElementById('new-courses-bin2').value || '' : '').trim();
+  const coursesBin2 = coursesBin2Raw ? coursesBin2Raw.split(',').map(c => c.trim()).filter(Boolean) : [];
   const carrier  = document.getElementById('new-carrier').value;
   const yoizumi  = false;
   const note    = document.getElementById('new-note').value.trim();
@@ -357,7 +377,7 @@ function addDriver() {
   if (editId) {
     const idx = drivers.findIndex(d => String(d.id) === String(editId));
     if (idx >= 0) {
-      drivers[idx] = { ...drivers[idx], name, code, depot, vehicle, vehicleId, phone, area, courses, carrier, yoizumi, note };
+      drivers[idx] = { ...drivers[idx], name, code, depot, vehicle, vehicleId, phone, area, courses, coursesBin2, carrier, yoizumi, note };
       savedDriver = drivers[idx]; // ← editIdが消える前に取得
     }
     document.getElementById('form-title').textContent = '新規登録';
@@ -365,7 +385,7 @@ function addDriver() {
     showToast('更新しました');
   } else {
     if (drivers.find(d => d.code === code)) { alert('この社員コードは既に使用されています'); return; }
-    const newDriver = { id: Date.now(), name, code, depot, vehicle, vehicleId, phone, area, courses, carrier, yoizumi, note };
+    const newDriver = { id: Date.now(), name, code, depot, vehicle, vehicleId, phone, area, courses, coursesBin2, carrier, yoizumi, note };
     drivers.push(newDriver);
     savedDriver = newDriver; // ← 新規登録したドライバーを取得
     showToast(`${name} を登録しました`);
@@ -383,7 +403,7 @@ function editDriver(id) {
   updateVehicleOptions(d.vehicleId || '');
   document.getElementById('new-phone').value   = d.phone || '';
   document.getElementById('new-area').value    = d.area || '';
-  renderCourseCheckboxes(d.courses || []);
+  renderCourseCheckboxes(d.courses || [], d.coursesBin2 || []);
   document.getElementById('new-carrier').value  = d.carrier || '';
   document.getElementById('new-note').value    = d.note || '';
   document.getElementById('form-title').textContent = `編集: ${d.name}`;
@@ -402,7 +422,8 @@ function deleteDriver(id) {
 function clearForm() {
   ['new-name','new-code','new-phone','new-area','new-note'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('new-courses').value = '';
-  renderCourseCheckboxes([]);
+  if (document.getElementById('new-courses-bin2')) document.getElementById('new-courses-bin2').value = '';
+  renderCourseCheckboxes([], []);
   updateVehicleOptions('');
   document.getElementById('new-depot').value   = 'both';
   document.getElementById('new-carrier').value  = '';
@@ -473,7 +494,7 @@ loadDrivers();
 updateCarrierOptions();
 updateVehicleOptions('');
 renderList();
-setTimeout(() => renderCourseCheckboxes([]), 0);
+setTimeout(() => renderCourseCheckboxes([], []), 0);
 </script>
 </body>
 </html>
