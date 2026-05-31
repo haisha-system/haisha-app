@@ -146,20 +146,19 @@
               <option value="">-- 選択してください --</option>
             </select>
           </div>
-
-        </div>
-        <div class="form-row">
           <div class="form-group">
             <label>電話番号</label>
             <input type="tel" id="new-phone" placeholder="090-0000-0000">
           </div>
-          <div class="form-group">
-            <label>担当エリア</label>
-            <input type="text" id="new-area" placeholder="例：姫路市内">
-          </div>
         </div>
         <div class="form-group">
-          <label>担当コース（1便）</label>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <label>担当コース（1便）</label>
+            <div style="display:flex;gap:6px;">
+              <button type="button" onclick="selectAllCourses('bin1')" style="font-size:11px;padding:2px 8px;background:rgba(245,158,11,0.2);border:1px solid rgba(245,158,11,0.4);color:#f59e0b;border-radius:4px;cursor:pointer;">全選択</button>
+              <button type="button" onclick="clearAllCourses('bin1')" style="font-size:11px;padding:2px 8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.4);border-radius:4px;cursor:pointer;">クリア</button>
+            </div>
+          </div>
           <div id="courses-checkboxes-bin1" style="
             background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);
             border-radius:6px; padding:8px 10px; max-height:100px; overflow-y:auto;
@@ -167,7 +166,13 @@
           ">
             <span style="color:rgba(255,255,255,0.3);font-size:12px;">読み込み中...</span>
           </div>
-          <label>担当コース（2便）</label>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <label>担当コース（2便）</label>
+            <div style="display:flex;gap:6px;">
+              <button type="button" onclick="selectAllCourses('bin2')" style="font-size:11px;padding:2px 8px;background:rgba(245,158,11,0.2);border:1px solid rgba(245,158,11,0.4);color:#f59e0b;border-radius:4px;cursor:pointer;">全選択</button>
+              <button type="button" onclick="clearAllCourses('bin2')" style="font-size:11px;padding:2px 8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.4);border-radius:4px;cursor:pointer;">クリア</button>
+            </div>
+          </div>
           <div id="courses-checkboxes-bin2" style="
             background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);
             border-radius:6px; padding:8px 10px; max-height:100px; overflow-y:auto;
@@ -224,6 +229,16 @@ function renderCourseCheckboxes(selectedCourses, selectedCoursesBin2) {
       wrap.appendChild(item);
     });
   });
+  updateCoursesHidden();
+}
+
+function selectAllCourses(bin) {
+  document.querySelectorAll('#courses-checkboxes-' + bin + ' input[type=checkbox]').forEach(cb => cb.checked = true);
+  updateCoursesHidden();
+}
+
+function clearAllCourses(bin) {
+  document.querySelectorAll('#courses-checkboxes-' + bin + ' input[type=checkbox]').forEach(cb => cb.checked = false);
   updateCoursesHidden();
 }
 
@@ -361,7 +376,7 @@ function addDriver() {
   const vehicleId = document.getElementById('new-vehicle').value;
   const vehicle = (function() { try { var vs = JSON.parse(localStorage.getItem('haisha_vehicles')||'[]'); var v = vs.find(function(x){ return String(x.id)===String(vehicleId); }); return v ? v.name : ''; } catch(e){ return ''; } })();
   const phone   = document.getElementById('new-phone').value.trim();
-  const area    = document.getElementById('new-area').value.trim();
+  const area    = document.getElementById('new-area') ? document.getElementById('new-area').value.trim() : '';
   const coursesRaw = (document.getElementById('new-courses').value || '').trim();
   const courses = coursesRaw ? coursesRaw.split(',').map(c => c.trim()).filter(Boolean) : [];
   const coursesBin2Raw = (document.getElementById('new-courses-bin2') ? document.getElementById('new-courses-bin2').value || '' : '').trim();
@@ -402,7 +417,7 @@ function editDriver(id) {
   document.getElementById('new-depot').value   = d.depot || 'both';
   updateVehicleOptions(d.vehicleId || '');
   document.getElementById('new-phone').value   = d.phone || '';
-  document.getElementById('new-area').value    = d.area || '';
+  if (document.getElementById('new-area')) document.getElementById('new-area').value = d.area || '';
   renderCourseCheckboxes(d.courses || [], d.coursesBin2 || []);
   document.getElementById('new-carrier').value  = d.carrier || '';
   document.getElementById('new-note').value    = d.note || '';
@@ -420,7 +435,7 @@ function deleteDriver(id) {
 }
 
 function clearForm() {
-  ['new-name','new-code','new-phone','new-area','new-note'].forEach(id => document.getElementById(id).value = '');
+  ['new-name','new-code','new-phone','new-note'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
   document.getElementById('new-courses').value = '';
   if (document.getElementById('new-courses-bin2')) document.getElementById('new-courses-bin2').value = '';
   renderCourseCheckboxes([], []);

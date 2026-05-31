@@ -1739,8 +1739,8 @@ function autoAssign() {
       // デポチェック：ドライバーのデポが設定されていて、店舗のデポも設定されている場合のみ絞り込む
       const dDepot = s.driver.depot || '';
       if (locDepot && dDepot && dDepot !== 'both') {
-        // ドライバーのデポコードと店舗のデポコードを比較
-        const dCode = dDepot === '神戸西デポ' ? '2806' : dDepot === '丹波デポ' ? '2805' : dDepot;
+        // kobe→2806, tamba→2805 に変換して比較
+        const dCode = dDepot === 'kobe' ? '2806' : dDepot === 'tamba' ? '2805' : dDepot;
         if (dCode !== locDepot) return false;
       }
       return true;
