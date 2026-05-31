@@ -56,6 +56,7 @@
     .filter-btn {
       padding: 4px 10px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.12);
       background: transparent; color: rgba(255,255,255,0.5); font-size: 11px; cursor: pointer; font-family: inherit;
+      white-space: nowrap; flex-shrink: 0;
     }
     .filter-btn.active { background: #06b6d4; color: white; border-color: #06b6d4; }
 
@@ -393,10 +394,10 @@ function renderEditPanel(code) {
         </div>
         <div class="form-group">
           <label>担当デポ</label>
-          <select id="edit-depot" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:white;border-radius:6px;padding:8px 6px;font-size:12px;font-family:inherit;width:100%;">
-            <option value="" ${!store.depot ? 'selected' : ''}>未設定</option>
-            <option value="2806" ${store.depot==='2806' ? 'selected' : ''}>神戸西</option>
-            <option value="2805" ${store.depot==='2805' ? 'selected' : ''}>丹波</option>
+          <select id="edit-depot" style="background:#1e2d3d;border:1px solid rgba(255,255,255,0.12);color:white;border-radius:6px;padding:8px 6px;font-size:12px;font-family:inherit;width:100%;">
+            <option value="" style="background:#1e2d3d;color:white;" ${!store.depot ? 'selected' : ''}>未設定</option>
+            <option value="2806" style="background:#1e2d3d;color:white;" ${store.depot==='2806' ? 'selected' : ''}>神戸西</option>
+            <option value="2805" style="background:#1e2d3d;color:white;" ${store.depot==='2805' ? 'selected' : ''}>丹波</option>
           </select>
         </div>
       </div>
