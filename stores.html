@@ -195,7 +195,7 @@
       <button class="filter-btn" onclick="setDepotFilter('2806', this)">🏭 神戸西</button>
       <button class="filter-btn" onclick="setDepotFilter('2805', this)">🏭 丹波</button>
     </div>
-    <div class="filter-bar" id="course-filter-bar" style="margin-top:6px;flex-wrap:wrap;gap:4px;"></div>
+    <div id="course-filter-bar" style="margin-top:6px;display:flex;flex-wrap:nowrap;gap:4px;overflow-x:auto;padding-bottom:4px;"></div>
     <div class="store-list" id="store-list"></div>
   </div>
 
@@ -378,27 +378,25 @@ function renderEditPanel(code) {
 
   document.getElementById('right-content').innerHTML = `
     <div class="edit-form">
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+      <div style="display:grid;grid-template-columns:140px 1fr 70px 120px;gap:8px;margin-bottom:8px;align-items:end;">
         <div class="form-group">
           <label>届け先コード</label>
-          <input type="text" value="${code}" readonly>
+          <input type="text" value="${code}" readonly style="font-size:12px;">
         </div>
         <div class="form-group">
           <label>店舗名</label>
           <input type="text" id="edit-name" value="${store.name}">
         </div>
         <div class="form-group">
-          <label>配送コース</label>
+          <label>コース</label>
           <input type="text" id="edit-course" value="${store.course || ''}" placeholder="例：01">
         </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:8px;">
         <div class="form-group">
           <label>担当デポ</label>
-          <select id="edit-depot" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:white;border-radius:6px;padding:8px 12px;font-size:13px;font-family:inherit;">
-            <option value="" ${!store.depot ? 'selected' : ''}>-- 未設定 --</option>
-            <option value="2806" ${store.depot==='2806' ? 'selected' : ''}>神戸西デポ（2806）</option>
-            <option value="2805" ${store.depot==='2805' ? 'selected' : ''}>丹波デポ（2805）</option>
+          <select id="edit-depot" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:white;border-radius:6px;padding:8px 6px;font-size:12px;font-family:inherit;width:100%;">
+            <option value="" ${!store.depot ? 'selected' : ''}>未設定</option>
+            <option value="2806" ${store.depot==='2806' ? 'selected' : ''}>神戸西</option>
+            <option value="2805" ${store.depot==='2805' ? 'selected' : ''}>丹波</option>
           </select>
         </div>
       </div>
