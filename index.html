@@ -2018,9 +2018,15 @@ function renderRightSidebar() {
         .map(loc => ({ loc, i: locations.indexOf(loc) }))
         .filter(({ i }) => i >= 0 && assignments[i] && assignments[i].driverId === activeDriverFilter);
     } else {
-      // ルート未表示時は割り当て順で表示
+      // ルート未表示時は便→stop_order順で表示
       locs = locations.map((loc, i) => ({loc, i}))
-        .filter(({i}) => assignments[i] && assignments[i].driverId === activeDriverFilter);
+        .filter(({i}) => assignments[i] && assignments[i].driverId === activeDriverFilter)
+        .sort((a, b) => {
+          const binA = assignments[a.i]?.bin || 1;
+          const binB = assignments[b.i]?.bin || 1;
+          if (binA !== binB) return binA - binB;
+          return (a.loc.stop_order || 0) - (b.loc.stop_order || 0);
+        });
     }
   } else {
     title.textContent = '配送先リスト';
@@ -2061,12 +2067,10 @@ function renderRightSidebar() {
     const dName = driverIdx >= 0 ? drivers[driverIdx].name : '未割当';
     const bin = asgn ? `第${asgn.bin}便` : '';
 
-    // 番号表示：ルート表示後のみ表示（地図ピンと一致させる）
+    // 番号表示：未割当フィルター以外は常に表示（地図ピンと一致）
     let stopNumStr = '';
-    if (activeDriverFilter === 'unassigned') {
-      stopNumStr = ''; // 未割当フィルターは番号なし
-    } else if (orderedLocations.length > 0) {
-      stopNumStr = String(loopIdx + 1); // ルート表示後：ループ順（地図ピンと一致）
+    if (activeDriverFilter !== 'unassigned') {
+      stopNumStr = String(loopIdx + 1);
     }
     card.innerHTML = `
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;">
