@@ -2108,20 +2108,26 @@ function renderRightSidebar() {
       header.textContent = `第${binNum}便  ${binLocs.length}件 / ${binItems}個 / ${binVol.toFixed(0)}才`;
       el.appendChild(header);
 
-      // 13件超えたら縦13件→右列に折り返し（CSS columns方式）
+      // 13件超えたら左列13件→右列に折り返し
       const COL_LIMIT = 13;
       const use2col = binLocs.length > COL_LIMIT;
-      const container = document.createElement('div');
-      if (use2col) {
-        container.style.cssText = 'column-count:2;column-gap:4px;';
+      if (!use2col) {
+        binLocs.forEach(({loc, i, idx}) => el.appendChild(makeCard(loc, i, idx, color, false)));
+      } else {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'display:flex;gap:4px;align-items:flex-start;';
+        const col1 = document.createElement('div');
+        col1.style.cssText = 'flex:1;min-width:0;';
+        const col2 = document.createElement('div');
+        col2.style.cssText = 'flex:1;min-width:0;';
+        binLocs.forEach(({loc, i, idx}, j) => {
+          const card = makeCard(loc, i, idx, color, true);
+          (j < COL_LIMIT ? col1 : col2).appendChild(card);
+        });
+        wrap.appendChild(col1);
+        wrap.appendChild(col2);
+        el.appendChild(wrap);
       }
-      binLocs.forEach(({loc, i, idx}) => {
-        const card = makeCard(loc, i, idx, color, use2col);
-        card.style.breakInside = 'avoid';
-        card.style.display = 'block';
-        container.appendChild(card);
-      });
-      el.appendChild(container);
     });
     return;
   }
