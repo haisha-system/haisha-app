@@ -56,12 +56,9 @@
     .btn-clr:hover { background: rgba(255,255,255,0.12); }
 
     .empty-msg { font-size: 13px; color: rgba(255,255,255,0.25); padding: 24px; text-align: center; }
-  .depot-badge {
-    font-size: 10px; padding: 2px 8px; border-radius: 3px; font-weight: 700; flex-shrink: 0;
-  }
+  .depot-badge { font-size: 10px; padding: 2px 8px; border-radius: 3px; font-weight: 700; flex-shrink: 0; }
   .badge-kobe  { background: rgba(6,182,212,0.2); color: #06b6d4; }
   .badge-tamba { background: rgba(167,139,250,0.2); color: #a78bfa; }
-  .badge-none  { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.3); }
   .form-group select {
     background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
     color: white; border-radius: 6px; padding: 8px 12px; font-size: 13px; font-family: inherit;
@@ -129,8 +126,8 @@
 
 <script>
 const STORAGE_KEY = 'haisha_courses';
-// 新形式: { '01': { name:'姫路エリア', depot:'2806' }, ... }
-// 旧形式: { '01': '姫路エリア', ... } も読み込み時に変換
+// 形式: { '01': { name:'姫路エリア', depot:'2806' } }
+// 旧形式( { '01': '姫路エリア' } )は読み込み時に自動変換
 let courses = {};
 
 function loadCourses() {
@@ -138,11 +135,11 @@ function loadCourses() {
     const d = localStorage.getItem(STORAGE_KEY);
     if (d) {
       const raw = JSON.parse(d);
-      // 旧形式（文字列）を新形式（オブジェクト）に変換
       Object.keys(raw).forEach(k => {
         if (typeof raw[k] === 'string') {
           raw[k] = { name: raw[k], depot: '' };
         }
+        if (!raw[k].depot) raw[k].depot = '';
       });
       courses = raw;
     }
@@ -153,7 +150,6 @@ function saveCourses() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(courses));
 }
 
-// コース名・デポを取得するヘルパー（新旧形式対応）
 function getCourseName(num) {
   const c = courses[num];
   if (!c) return '';
@@ -174,12 +170,12 @@ function renderList() {
   }
   el.innerHTML = '';
   nums.forEach(num => {
-    const name = getCourseName(num);
-    const row = document.createElement('div');
-    row.className = 'course-row';
+    const name  = getCourseName(num);
     const depot = getCourseDepot(num);
     const depotLabel = depot === '2806' ? '🏭神戸西' : depot === '2805' ? '🏭丹波' : '';
-    const depotClass = depot === '2806' ? 'badge-kobe' : depot === '2805' ? 'badge-tamba' : 'badge-none';
+    const depotClass = depot === '2806' ? 'badge-kobe' : depot === '2805' ? 'badge-tamba' : '';
+    const row = document.createElement('div');
+    row.className = 'course-row';
     row.innerHTML = `
       <div class="course-num">${num}</div>
       <div class="course-name ${name ? '' : 'empty'}">${name || '（名称未設定）'}</div>
@@ -194,11 +190,11 @@ function renderList() {
 }
 
 function saveCourse() {
-  const num  = document.getElementById('new-num').value.trim();
-  const name = document.getElementById('new-name').value.trim();
+  const num   = document.getElementById('new-num').value.trim();
+  const name  = document.getElementById('new-name').value.trim();
+  const depot = document.getElementById('new-depot') ? document.getElementById('new-depot').value : '';
   if (!num) { alert('コース番号は必須です'); return; }
 
-  const depot = document.getElementById('new-depot') ? document.getElementById('new-depot').value : '';
   const editNum = document.getElementById('form-title').dataset.editNum;
   if (editNum && editNum !== num) {
     delete courses[editNum];
@@ -215,7 +211,7 @@ function editCourse(num) {
   document.getElementById('new-name').value = getCourseName(num);
   const depotEl = document.getElementById('new-depot');
   if (depotEl) depotEl.value = getCourseDepot(num);
-  document.getElementById('form-title').textContent = '編集: ' + num;
+  document.getElementById('form-title').textContent  = '編集: ' + num;
   document.getElementById('form-title').dataset.editNum = num;
 }
 
@@ -230,40 +226,38 @@ function deleteCourse(num) {
 function clearForm() {
   document.getElementById('new-num').value  = '';
   document.getElementById('new-name').value = '';
-  const depotClr = document.getElementById('new-depot');
-  if (depotClr) depotClr.value = '';
+  const depotEl = document.getElementById('new-depot');
+  if (depotEl) depotEl.value = '';
   document.getElementById('form-title').textContent = '新規登録';
   document.getElementById('form-title').dataset.editNum = '';
 }
 
-// 店舗データからコース番号を自動取得
+// 店舗データからコース番号・デポを自動取得
 function importFromStores() {
   try {
-    const stores = JSON.parse(localStorage.getItem('haisha_stores') || '{}');
+    const storeData = JSON.parse(localStorage.getItem('haisha_stores') || '{}');
     const found = new Set();
-    Object.values(stores).forEach(s => {
-      if (s.course && s.course.trim()) found.add(s.course.trim());
+    const courseDepotMap = {};
+    Object.values(storeData).forEach(s => {
+      if (s.course && s.course.trim()) {
+        found.add(s.course.trim());
+        if (s.depot) courseDepotMap[s.course.trim()] = s.depot;
+      }
     });
     if (found.size === 0) {
       alert('店舗データにコース番号が見つかりません。\nCSVを読み込んでから再試行してください。');
       return;
     }
-    // 店舗データからコースごとのデポも収集
-    const courseDepotMap = {};
-    Object.values(stores).forEach(s => {
-      if (s.course && s.course.trim() && s.depot) {
-        courseDepotMap[s.course.trim()] = s.depot;
-      }
-    });
     let added = 0;
     found.forEach(num => {
       if (!courses[num]) {
         courses[num] = { name: '', depot: courseDepotMap[num] || '' };
         added++;
-      } else if (!getCourseDepot(num) && courseDepotMap[num]) {
-        // 既存コースにデポが未設定なら補完
-        if (typeof courses[num] === 'string') courses[num] = { name: courses[num], depot: courseDepotMap[num] };
-        else courses[num].depot = courseDepotMap[num];
+      } else {
+        // 既存でデポ未設定なら補完
+        if (!getCourseDepot(num) && courseDepotMap[num]) {
+          courses[num].depot = courseDepotMap[num];
+        }
       }
     });
     saveCourses();

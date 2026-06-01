@@ -281,6 +281,9 @@ function renderCourseFilterBar() {
   // courses.htmlのラベルを取得
   let courseMap = {};
   try { courseMap = JSON.parse(localStorage.getItem('haisha_courses') || '{}'); } catch(e) {}
+  // 新旧両形式対応：文字列 or { name, depot }
+  const _cn = num => { const v = courseMap[num]; if (!v) return ''; return typeof v === 'string' ? v : (v.name || ''); };
+  const _cn = (num) => { const v = courseMap[num]; if (!v) return ''; return typeof v === 'string' ? v : (v.name || ''); };
 
   const nums = [...courses].sort();
   bar.innerHTML = '';
@@ -293,7 +296,7 @@ function renderCourseFilterBar() {
   bar.appendChild(allBtn);
 
   nums.forEach(num => {
-    const label = courseMap[num] ? num + ' ' + courseMap[num] : 'コース' + num;
+    const label = _cn(num) ? num + ' ' + _cn(num) : 'コース' + num;
     const btn = document.createElement('button');
     btn.className = 'course-filter-btn filter-btn';
     btn.textContent = label;
@@ -601,24 +604,20 @@ renderCourseFilterBar();
 renderList();
 
 function autoFillDepotFromCourses() {
-  // courses.htmlで管理しているコース→デポ対応を読み込む
-  let courseMap = {};
+  let courseMap2 = {};
   try {
     const raw = JSON.parse(localStorage.getItem('haisha_courses') || '{}');
     Object.keys(raw).forEach(k => {
       const v = raw[k];
-      courseMap[k] = typeof v === 'string' ? '' : (v.depot || '');
+      courseMap2[k] = typeof v === 'string' ? '' : (v.depot || '');
     });
   } catch(e) {}
-
   let updated = false;
   Object.keys(stores).forEach(code => {
-    const s = stores[code];
-    // 手動設定済みはスキップ
-    if (s.depotManual) return;
-    // デポが未設定でコース番号がある場合のみ補完
-    if (!s.depot && s.course && courseMap[s.course.trim()]) {
-      stores[code].depot = courseMap[s.course.trim()];
+    const s2 = stores[code];
+    if (s2.depotManual) return;
+    if (!s2.depot && s2.course && courseMap2[s2.course.trim()]) {
+      stores[code].depot = courseMap2[s2.course.trim()];
       updated = true;
     }
   });
