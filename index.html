@@ -40,14 +40,14 @@
     #map { flex: 1; }
     /* 左サイドバー：ドライバー一覧 */
     #sidebar-left {
-      width: 200px; background: #161f2c;
+      width: 220px; background: #161f2c;
       border-right: 1px solid rgba(255,255,255,0.08);
       overflow-y: auto; padding: 10px;
       flex-shrink: 0; display: flex; flex-direction: column;
     }
     /* 右サイドバー：配送先リスト */
     #sidebar-right {
-      width: 320px; background: #161f2c;
+      width: 340px; background: #161f2c;
       border-left: 1px solid rgba(255,255,255,0.08);
       overflow-y: auto; padding: 10px;
       flex-shrink: 0;
@@ -121,16 +121,15 @@
 
     /* ドライバーカード（サイドバー） */
     .driver-sb-card {
-      padding: 5px 8px; border-radius: 5px; margin-bottom: 3px;
+      padding: 8px 10px; border-radius: 6px; margin-bottom: 5px;
       cursor: pointer; border: 1px solid rgba(255,255,255,0.08);
       background: rgba(255,255,255,0.04); transition: all 0.15s;
-      display: flex; align-items: center; gap: 6px;
     }
     .driver-sb-card:hover { background: rgba(255,255,255,0.1); }
     .driver-sb-card.active { border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); }
-    .driver-sb-name { font-size: 12px; font-weight: 700; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
-    .driver-sb-meta { font-size: 10px; color: rgba(255,255,255,0.4); white-space: nowrap; flex-shrink: 0; }
-    .driver-sb-dot  { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .driver-sb-name { font-size: 13px; font-weight: 700; color: white; }
+    .driver-sb-meta { font-size:11px; color: rgba(255,255,255,0.4); margin-top:2px; }
+    .driver-sb-dot  { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:6px; flex-shrink:0; }
 
     /* 店舗リスト */
 
@@ -147,17 +146,6 @@
 
     #overlay {
       display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 999;
-    }
-    /* 24型モニター対応（幅1920px未満で自動縮小） */
-    @media (max-width: 1920px) {
-      #sidebar-left  { width: 185px; }
-      #sidebar-right { width: 300px; }
-      .driver-sb-name { font-size: 11px; }
-      .driver-sb-meta { font-size: 9px; }
-    }
-    @media (max-width: 1600px) {
-      #sidebar-left  { width: 170px; }
-      #sidebar-right { width: 280px; }
     }
     .panel h2 { font-size: 15px; margin-bottom: 12px; color: #2c3e50; }
     .panel-close {
@@ -963,7 +951,7 @@ function loadCSV(file) {
         const addr = cols[addrIdx] || '';
         const items = parseFloat(cols[itemIdx]) || 0;
         const vol   = parseFloat(cols[volIdx])   || 0;
-        const course = courseIdx >= 0 ? (cols[courseIdx] || '').trim().replace(/^'+/, '') : '';
+        const course = courseIdx >= 0 ? (cols[courseIdx] || '').trim().replace(/^'+/, '').padStart(2, '0') : '';
         const depotCode = depotCodeIdx >= 0 ? (cols[depotCodeIdx]||'').trim().replace(/^'+/, '') : '';
 
         if (!name.trim() || !addr.trim()) return;
@@ -1744,54 +1732,61 @@ function autoAssign() {
     .map((loc, i) => ({ loc, i, vol: Number(loc.vol) || 0, items: Number(loc.items) || 0 }))
     .sort((a, b) => b.vol !== a.vol ? b.vol - a.vol : b.items - a.items);
 
-  // 各ドライバーの現在の積載状況
+  // コース番号ゼロ埋め2桁統一ヘルパー
+  const normCourse = c => String(c || '').trim().replace(/^'+/, '').padStart(2, '0');
+
+  // 各ドライバーの積載状況（1便・2便それぞれ独立カウンター）
   const driverState = activeDrivers.map(d => {
     const limits = getDriverLimits(d);
-    return { driver: d, usedVol: 0, usedItems: 0, maxVol: limits.maxVol, maxItems: limits.maxItems, assigned: [] };
+    return {
+      driver: d,
+      usedVol1: 0, usedItems1: 0,
+      usedVol2: 0, usedItems2: 0,
+      maxVol: limits.maxVol, maxItems: limits.maxItems,
+      assigned: []
+    };
   });
 
   // 割り当てループ
   sorted.forEach(({ loc, i, vol, items }) => {
-    const locCourse = (loc.course || '').trim();
-    const locDepot  = (loc.depotCode || '').trim();
+    const locCourse = normCourse(loc.course);
+    const locDepot  = (loc.depotCode || '').trim().replace(/^'+/, '');
 
-    // このlocを積める（積載上限内の）ドライバーを絞り込む
-    let capable = driverState.filter(s => {
-      // 積載チェック
-      if (s.usedVol + vol > s.maxVol) return false;
-      if (s.usedItems + items > s.maxItems) return false;
-      // デポチェック：ドライバーのデポが設定されていて、店舗のデポも設定されている場合のみ絞り込む
+    const depotOk = s => {
       const dDepot = s.driver.depot || '';
-      if (locDepot && dDepot && dDepot !== 'both') {
-        // kobe→2806, tamba→2805 に変換して比較
-        const dCode = dDepot === 'kobe' ? '2806' : dDepot === 'tamba' ? '2805' : dDepot;
-        if (dCode !== locDepot) return false;
-      }
-      return true;
-    });
-    if (capable.length === 0) return; // 積めるドライバーなし → 未割当
+      if (!locDepot || !dDepot || dDepot === 'both') return true;
+      const dCode = dDepot === 'kobe' ? '2806' : dDepot === 'tamba' ? '2805' : dDepot;
+      return dCode === locDepot;
+    };
 
-    // コース一致チェック（1便・2便）
-    const bin1Match = capable.filter(s =>
-      s.driver.courses && s.driver.courses.length > 0 && s.driver.courses.includes(locCourse)
+    // コース一致 × 積載チェック（1便・2便独立）
+    const bin1Match = driverState.filter(s =>
+      depotOk(s) &&
+      s.driver.courses && s.driver.courses.length > 0 &&
+      s.driver.courses.map(normCourse).includes(locCourse) &&
+      s.usedVol1 + vol <= s.maxVol &&
+      s.usedItems1 + items <= s.maxItems
     );
-    const bin2Match = capable.filter(s =>
-      s.driver.coursesBin2 && s.driver.coursesBin2.length > 0 && s.driver.coursesBin2.includes(locCourse)
+    const bin2Match = driverState.filter(s =>
+      depotOk(s) &&
+      s.driver.coursesBin2 && s.driver.coursesBin2.length > 0 &&
+      s.driver.coursesBin2.map(normCourse).includes(locCourse) &&
+      s.usedVol2 + vol <= s.maxVol &&
+      s.usedItems2 + items <= s.maxItems
     );
 
-    // 候補と便番号を決定
+    // コース一致なし → 未割当（フォールバックなし）
     let candidates, binNum;
     if (bin1Match.length > 0) {
       candidates = bin1Match; binNum = 1;
     } else if (bin2Match.length > 0) {
       candidates = bin2Match; binNum = 2;
     } else {
-      candidates = capable; binNum = 1;
+      return; // コース不一致・未設定 → 未割当
     }
 
-    // スコア計算：地理的距離（コース一致は既に候補を絞り込んでいる）
-    let best = null;
-    let bestScore = Infinity;
+    // スコア計算：地理的距離
+    let best = null, bestScore = Infinity;
     candidates.forEach(s => {
       let score;
       if (s.assigned.length === 0) {
@@ -1806,8 +1801,8 @@ function autoAssign() {
 
     if (best) {
       assignments[i] = { driverId: best.driver.id, bin: binNum };
-      best.usedVol   += vol;
-      best.usedItems += items;
+      if (binNum === 1) { best.usedVol1 += vol; best.usedItems1 += items; }
+      else              { best.usedVol2 += vol; best.usedItems2 += items; }
       best.assigned.push(loc);
     }
   });
@@ -2023,8 +2018,7 @@ function renderRightSidebar() {
     locs = locations.map((loc, i) => ({loc, i})).filter(({i}) => !assignments[i]);
   } else if (activeDriverFilter !== null) {
     const driver = drivers.find(d => d.id === activeDriverFilter);
-    const dName = driver ? driver.name : '不明';
-    title.textContent = `${dName} の配送先`;
+    title.textContent = `${driver ? driver.name : '不明'} の配送先`;
     if (orderedLocations.length > 0) {
       locs = orderedLocations
         .map(loc => ({ loc, i: locations.indexOf(loc) }))
@@ -2033,29 +2027,24 @@ function renderRightSidebar() {
       locs = locations.map((loc, i) => ({loc, i}))
         .filter(({i}) => assignments[i] && assignments[i].driverId === activeDriverFilter)
         .sort((a, b) => {
-          const binA = assignments[a.i]?.bin || 1;
-          const binB = assignments[b.i]?.bin || 1;
-          if (binA !== binB) return binA - binB;
-          return (a.loc.stop_order || 0) - (b.loc.stop_order || 0);
+          const ba = assignments[a.i]?.bin || 1, bb = assignments[b.i]?.bin || 1;
+          return ba !== bb ? ba - bb : (a.loc.stop_order||0) - (b.loc.stop_order||0);
         });
     }
   } else {
     title.textContent = '配送先リスト';
-    if (orderedLocations.length > 0) {
-      locs = orderedLocations.map(loc => ({loc, i: locations.indexOf(loc)})).filter(({i}) => i >= 0);
-    } else {
-      locs = locations.map((loc, i) => ({loc, i}));
-    }
+    locs = orderedLocations.length > 0
+      ? orderedLocations.map(loc => ({loc, i: locations.indexOf(loc)})).filter(({i}) => i >= 0)
+      : locations.map((loc, i) => ({loc, i}));
   }
 
   el.innerHTML = '';
-
   if (locs.length === 0) {
     el.innerHTML = '<p style="font-size:11px;color:rgba(255,255,255,0.3);">表示する配送先がありません</p>';
     return;
   }
 
-  // 合計表示
+  // 合計サマリー
   const totalItems = locs.reduce((s,{loc})=>s+(Number(loc.items)||0),0);
   const totalVol   = locs.reduce((s,{loc})=>s+(Number(loc.vol)||0),0);
   const summary = document.createElement('div');
@@ -2063,22 +2052,52 @@ function renderRightSidebar() {
   summary.textContent = `${locs.length}件 / ${totalItems}個 / ${totalVol.toFixed(1)}才`;
   el.appendChild(summary);
 
-  // ===== 便ごとに列分け表示（ドライバー選択中のみ） =====
-  const COL_LIMIT = 13; // 1列あたりの最大件数
+  // カード生成ヘルパー
+  function makeCard(loc, i, loopIdx, color, useSmall) {
+    const card = document.createElement('div');
+    card.className = 'stop-card';
+    card.draggable = true;
+    card.dataset.locIdx = i;
+    card.style.borderLeft = `3px solid ${color}`;
+    card.style.marginBottom = '2px';
+    if (useSmall) card.style.fontSize = '10px';
+    const numW = loopIdx >= 99 ? '22px' : loopIdx >= 9 ? '18px' : '16px';
+    const numStr = activeDriverFilter !== 'unassigned' ? String(loopIdx + 1) : '';
+    card.innerHTML = `
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:2px;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:3px;margin-bottom:1px;">
+            ${numStr ? `<span style="background:${color};color:white;border-radius:50%;width:${numW};height:${numW};display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:bold;flex-shrink:0;">${numStr}</span>` : ''}
+            <span style="font-weight:600;color:rgba(255,255,255,0.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${loc.name}</span>
+          </div>
+          <div style="font-size:9px;color:rgba(255,255,255,0.4);display:flex;gap:4px;padding-left:${numStr ? numW : '0'};">
+            ${loc.items ? `<span>${loc.items}個</span>` : ''}
+            ${loc.vol   ? `<span>${Number(loc.vol).toFixed(0)}才</span>` : ''}
+          </div>
+        </div>
+        ${assignments[i] ? `<button onclick="unassignStop(${i})" style="flex-shrink:0;background:rgba(239,68,68,0.15);color:#f87171;border:none;border-radius:3px;padding:1px 4px;font-size:9px;cursor:pointer;">解除</button>` : ''}
+      </div>`;
+    card.addEventListener('dragstart', e => { draggedLocIdx = i; card.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+    card.addEventListener('dragend', () => { card.classList.remove('dragging'); draggedLocIdx = null; });
+    card.addEventListener('click', e => { if (e.target.tagName === 'BUTTON') return; highlightStopCard(i); highlightMarker(loc); });
+    return card;
+  }
+
+  // ===== ドライバー選択中：便ごとにヘッダー＋縦→2列表示 =====
   if (activeDriverFilter !== null && activeDriverFilter !== 'unassigned') {
+    const driverIdx = drivers.findIndex(d => d.id === activeDriverFilter);
+    const color = driverIdx >= 0 ? DRIVER_COLORS[driverIdx % DRIVER_COLORS.length] : 'rgba(255,255,255,0.2)';
+
     // 便ごとにグループ化
     const bins = {};
-    locs.forEach(({loc, i}, loopIdx) => {
+    locs.forEach(({loc, i}, idx) => {
       const bin = assignments[i]?.bin || 1;
       if (!bins[bin]) bins[bin] = [];
-      bins[bin].push({loc, i, loopIdx});
+      bins[bin].push({loc, i, idx});
     });
-    const binNums = Object.keys(bins).map(Number).sort((a,b)=>a-b);
 
-    binNums.forEach(binNum => {
+    Object.keys(bins).map(Number).sort((a,b)=>a-b).forEach(binNum => {
       const binLocs = bins[binNum];
-      const driverIdx = activeDriverFilter !== null ? drivers.findIndex(d => d.id === activeDriverFilter) : -1;
-      const color = driverIdx >= 0 ? DRIVER_COLORS[driverIdx % DRIVER_COLORS.length] : 'rgba(255,255,255,0.2)';
       const binItems = binLocs.reduce((s,{loc})=>s+(Number(loc.items)||0),0);
       const binVol   = binLocs.reduce((s,{loc})=>s+(Number(loc.vol)||0),0);
 
@@ -2088,89 +2107,47 @@ function renderRightSidebar() {
       header.textContent = `第${binNum}便  ${binLocs.length}件 / ${binItems}個 / ${binVol.toFixed(0)}才`;
       el.appendChild(header);
 
-      // 13件超えたら2列グリッド
-      const useGrid = binLocs.length > COL_LIMIT;
-      const grid = document.createElement('div');
-      grid.style.cssText = useGrid
-        ? 'display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-bottom:4px;'
-        : 'margin-bottom:4px;';
-      el.appendChild(grid);
-
-      binLocs.forEach(({loc, i, loopIdx}) => {
-        const card = document.createElement('div');
-        card.className = 'stop-card';
-        card.draggable = true;
-        card.dataset.locIdx = i;
-        card.style.borderLeft = `3px solid ${color}`;
-        card.style.marginBottom = '2px';
-        // 2列時はフォント縮小
-        if (useGrid) card.style.fontSize = '10px';
-
-        const stopNumStr = activeDriverFilter !== 'unassigned' ? String(loopIdx + 1) : '';
-        const numCircleW = stopNumStr.length > 2 ? '20px' : '16px';
-        card.innerHTML = `
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:2px;">
-            <div style="flex:1;min-width:0;">
-              <div style="display:flex;align-items:center;gap:3px;margin-bottom:1px;">
-                ${stopNumStr ? `<span style="background:${color};color:white;border-radius:50%;width:${numCircleW};height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:bold;flex-shrink:0;">${stopNumStr}</span>` : ''}
-                <span style="font-weight:600;color:rgba(255,255,255,0.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${loc.name}</span>
-              </div>
-              <div style="font-size:9px;color:rgba(255,255,255,0.4);display:flex;gap:4px;padding-left:${stopNumStr?'20px':'0'};">
-                ${loc.items ? `<span>${loc.items}個</span>` : ''}
-                ${loc.vol   ? `<span>${Number(loc.vol).toFixed(0)}才</span>` : ''}
-              </div>
-            </div>
-            <button onclick="unassignStop(${i})" style="flex-shrink:0;background:rgba(239,68,68,0.15);color:#f87171;border:none;border-radius:3px;padding:1px 4px;font-size:9px;cursor:pointer;">解除</button>
-          </div>
-        `;
-        card.addEventListener('dragstart', e => { draggedLocIdx = i; card.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
-        card.addEventListener('dragend', () => { card.classList.remove('dragging'); draggedLocIdx = null; });
-        card.addEventListener('click', (e) => { if (e.target.tagName === 'BUTTON') return; highlightStopCard(i); highlightMarker(loc); });
-        grid.appendChild(card);
-      });
+      // 13件超えたら2列
+      const use2col = binLocs.length > 13;
+      if (use2col) {
+        // 2列：左列（ceil(n/2)件）→右列
+        const half = Math.ceil(binLocs.length / 2);
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'display:flex;gap:2px;';
+        const col1 = document.createElement('div'); col1.style.cssText = 'flex:1;min-width:0;';
+        const col2 = document.createElement('div'); col2.style.cssText = 'flex:1;min-width:0;';
+        binLocs.forEach(({loc, i, idx}, j) => {
+          const card = makeCard(loc, i, idx, color, true);
+          (j < half ? col1 : col2).appendChild(card);
+        });
+        wrap.appendChild(col1); wrap.appendChild(col2);
+        el.appendChild(wrap);
+      } else {
+        binLocs.forEach(({loc, i, idx}) => el.appendChild(makeCard(loc, i, idx, color, false)));
+      }
     });
     return;
   }
 
-  // ===== ドライバー未選択 or 未割当：従来の1列表示 =====
+  // ===== 全件表示・未割当：従来の1列 =====
   locs.forEach(({loc, i}, loopIdx) => {
     const asgn = assignments[i];
     const driverIdx = asgn ? drivers.findIndex(d => d.id === asgn.driverId) : -1;
     const color = driverIdx >= 0 ? DRIVER_COLORS[driverIdx % DRIVER_COLORS.length] : 'rgba(255,255,255,0.2)';
-
-    const card = document.createElement('div');
-    card.className = 'stop-card';
-    card.draggable = true;
-    card.dataset.locIdx = i;
-    card.style.borderLeft = `3px solid ${color}`;
-
     const dName = driverIdx >= 0 ? drivers[driverIdx].name : '未割当';
-    const bin = asgn ? `第${asgn.bin}便` : '';
-    const stopNumStr = activeDriverFilter !== 'unassigned' ? String(loopIdx + 1) : '';
-    const numCircleW = stopNumStr.length > 2 ? '20px' : '16px';
-    card.innerHTML = `
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;">
-        <div style="flex:1;min-width:0;">
-          <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px;">
-            ${stopNumStr ? `<span style="background:${color};color:white;border-radius:50%;width:${numCircleW};height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:bold;flex-shrink:0;">${stopNumStr}</span>` : ''}
-            <span style="font-weight:600;color:rgba(255,255,255,0.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${loc.name}</span>
-          </div>
-          <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:1px;display:flex;gap:6px;padding-left:${stopNumStr?numCircleW:'0'};">
-            ${loc.items ? `<span>${loc.items}個</span>` : ''}
-            ${loc.vol   ? `<span>${Number(loc.vol).toFixed(0)}才</span>` : ''}
-            ${asgn ? `<span style="color:${color};">${dName} ${bin}</span>` : '<span style="color:#f59e0b;">未割当</span>'}
-          </div>
-        </div>
-        ${asgn ? `<button onclick="unassignStop(${i})" style="flex-shrink:0;background:rgba(239,68,68,0.15);color:#f87171;border:none;border-radius:3px;padding:2px 5px;font-size:9px;cursor:pointer;margin-top:2px;">解除</button>` : ''}
-      </div>
-    `;
-    card.addEventListener('dragstart', e => { draggedLocIdx = i; card.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
-    card.addEventListener('dragend', () => { card.classList.remove('dragging'); draggedLocIdx = null; });
-    card.addEventListener('click', (e) => { if (e.target.tagName === 'BUTTON') return; highlightStopCard(i); highlightMarker(loc); });
+    const bin   = asgn ? `第${asgn.bin}便` : '';
+    const card  = makeCard(loc, i, loopIdx, color, false);
+    // 全件表示時はドライバー名・便を下段に追加
+    const meta = card.querySelector('div[style*="gap:4px"]') || card.querySelector('div[style*="gap: 4px"]');
+    if (meta) {
+      const sp = document.createElement('span');
+      sp.style.cssText = asgn ? `color:${color};` : 'color:#f59e0b;';
+      sp.textContent = asgn ? `${dName} ${bin}` : '未割当';
+      meta.appendChild(sp);
+    }
     el.appendChild(card);
   });
 }
-
 function closeAllPanels() {
   const ap=document.getElementById('assign-panel'); if(ap) ap.style.display='none';
   document.getElementById('overlay').style.display='none';
@@ -2199,7 +2176,7 @@ function renderDriverSidebar() {
   allBtn.className = 'driver-sb-card' + (activeDriverFilter === null ? ' active' : '');
   allBtn.style.borderLeft = '3px solid rgba(255,255,255,0.3)';
   const totalAssigned = Object.keys(assignments).length;
-  allBtn.innerHTML = `<span class="driver-sb-dot" style="background:rgba(255,255,255,0.3);"></span><span class="driver-sb-name">全件表示</span><span class="driver-sb-meta">${activeDrivers.length}名/${totalAssigned}件</span>`;
+  allBtn.innerHTML = `<div style="display:flex;align-items:center;"><span class="driver-sb-dot" style="background:rgba(255,255,255,0.3);"></span><span class="driver-sb-name">全件表示</span></div><div class="driver-sb-meta">${activeDrivers.length}名稼働 / ${totalAssigned}件割当済</div>`;
   allBtn.onclick = () => {
     activeDriverFilter = null;
     if (routeLines.length > 0) {
@@ -2241,7 +2218,7 @@ function renderDriverSidebar() {
   const unassignedLocs = locations.filter((_, i) => !assignments[i]);
   const unassignedItems = unassignedLocs.reduce((s, l) => s + (Number(l.items) || 0), 0);
   const unassignedVol   = unassignedLocs.reduce((s, l) => s + (Number(l.vol)   || 0), 0);
-  unBtn.innerHTML = `<span class="driver-sb-dot" style="background:#f59e0b;"></span><span class="driver-sb-name">未割当</span><span class="driver-sb-meta">${unassignedCount}件/${unassignedItems}個/${unassignedVol.toFixed(0)}才</span>`;
+  unBtn.innerHTML = `<div style="display:flex;align-items:center;"><span class="driver-sb-dot" style="background:#f59e0b;"></span><span class="driver-sb-name">未割当</span></div><div class="driver-sb-meta">${unassignedCount}件 / ${unassignedItems}個 / ${unassignedVol.toFixed(1)}才</div>`;
   unBtn.onclick = () => {
     activeDriverFilter = 'unassigned';
     routeLines.forEach(({line}) => line.setMap(null));
@@ -2284,7 +2261,7 @@ function renderDriverSidebar() {
     card.style.borderLeft = `3px solid ${color}`;
     if (driver.yoizumiToday) card.style.background = 'rgba(139,92,246,0.15)';
     const myVol = myLocs.reduce((s, l) => s + (Number(l.vol) || 0), 0);
-    card.innerHTML = `<span class="driver-sb-dot" style="background:${color};"></span><span class="driver-sb-name">${driver.name}${driver.yoizumiToday?' 🌙':''}</span><span class="driver-sb-meta">${myLocs.length}件/${myItems}個/${myVol.toFixed(0)}才</span>`;
+    card.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;"><div style="display:flex;align-items:center;"><span class="driver-sb-dot" style="background:${color};"></span><span class="driver-sb-name">${driver.name}</span>${driver.yoizumiToday?'<span style="font-size:10px;margin-left:4px;">🌙</span>':''}</div><span style="font-size:10px;color:rgba(255,255,255,0.4);">${driver.code||''}</span></div><div class="driver-sb-meta">${myLocs.length}件 / ${myItems}個 / ${myVol.toFixed(1)}才</div>`;
     // ドロップゾーン設定
     card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('drop-target'); });
     card.addEventListener('dragleave', () => card.classList.remove('drop-target'));
