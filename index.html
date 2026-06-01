@@ -951,7 +951,7 @@ function loadCSV(file) {
         const addr = cols[addrIdx] || '';
         const items = parseFloat(cols[itemIdx]) || 0;
         const vol   = parseFloat(cols[volIdx])   || 0;
-        const course = courseIdx >= 0 ? (cols[courseIdx] || '').trim().replace(/^'+/, '').padStart(2, '0') : '';
+        const course = courseIdx >= 0 ? (cols[courseIdx] || '').trim().replace(/^'+/, '') : '';
         const depotCode = depotCodeIdx >= 0 ? (cols[depotCodeIdx]||'').trim().replace(/^'+/, '') : '';
 
         if (!name.trim() || !addr.trim()) return;
@@ -1289,7 +1289,12 @@ function renderDepotFilterBtns() {
     // デポコードなし：シンプル表示
     const item = document.createElement('div');
     item.className = 'depot-select-item active';
-    item.innerHTML = `<div class="depot-select-dot"></div><div class="depot-select-name" id="depot-display-name">神戸西デポ</div>`;
+    const allItems = locations.reduce((s, l) => s + (Number(l.items) || 0), 0);
+    const allVol   = locations.reduce((s, l) => s + (Number(l.vol)   || 0), 0);
+    const allMeta  = locations.length > 0
+      ? `<div style="font-size:10px;color:rgba(255,255,255,0.45);margin-top:2px;">${locations.length}件 / ${allItems}個 / ${allVol.toFixed(1)}才</div>`
+      : '';
+    item.innerHTML = `<div class="depot-select-dot"></div><div style="flex:1;"><div class="depot-select-name" id="depot-display-name">神戸西デポ</div>${allMeta}</div>`;
     container.appendChild(item);
     return;
   }
@@ -1302,7 +1307,14 @@ function renderDepotFilterBtns() {
 
     const item = document.createElement('div');
     item.className = 'depot-select-item' + (isActive ? ' active' : '');
-    item.innerHTML = `<div class="depot-select-dot"></div><div class="depot-select-name">${label}</div>`;
+    // デポに紐づく件数・個数・才数を集計
+    const depotLocs = locations.filter(l => l.depotCode === code);
+    const depotItems = depotLocs.reduce((s, l) => s + (Number(l.items) || 0), 0);
+    const depotVol   = depotLocs.reduce((s, l) => s + (Number(l.vol)   || 0), 0);
+    const depotMeta  = depotLocs.length > 0
+      ? `<div style="font-size:10px;color:rgba(255,255,255,0.45);margin-top:2px;">${depotLocs.length}件 / ${depotItems}個 / ${depotVol.toFixed(1)}才</div>`
+      : '';
+    item.innerHTML = `<div class="depot-select-dot"></div><div style="flex:1;"><div class="depot-select-name">${label}</div>${depotMeta}</div>`;
     item.onclick = () => toggleDepotFilter(code);
     container.appendChild(item);
   });
@@ -1720,61 +1732,52 @@ function autoAssign() {
     .map((loc, i) => ({ loc, i, vol: Number(loc.vol) || 0, items: Number(loc.items) || 0 }))
     .sort((a, b) => b.vol !== a.vol ? b.vol - a.vol : b.items - a.items);
 
-  // 各ドライバーの現在の積載状況（1便・2便それぞれ独立したカウンター）
-  const normCourse = c => String(c || '').trim().replace(/^'+/, '').padStart(2, '0');
+  // 各ドライバーの現在の積載状況
   const driverState = activeDrivers.map(d => {
     const limits = getDriverLimits(d);
-    return {
-      driver: d,
-      // 1便カウンター
-      usedVol1: 0, usedItems1: 0,
-      // 2便カウンター
-      usedVol2: 0, usedItems2: 0,
-      maxVol: limits.maxVol, maxItems: limits.maxItems,
-      assigned: []
-    };
+    return { driver: d, usedVol: 0, usedItems: 0, maxVol: limits.maxVol, maxItems: limits.maxItems, assigned: [] };
   });
 
   // 割り当てループ
   sorted.forEach(({ loc, i, vol, items }) => {
-    const locCourse = normCourse(loc.course);
-    const locDepot  = (loc.depotCode || '').trim().replace(/^'+/, '');
+    const locCourse = (loc.course || '').trim();
+    const locDepot  = (loc.depotCode || '').trim();
 
-    // デポ絞り込み
-    const depotOk = s => {
+    // このlocを積める（積載上限内の）ドライバーを絞り込む
+    let capable = driverState.filter(s => {
+      // 積載チェック
+      if (s.usedVol + vol > s.maxVol) return false;
+      if (s.usedItems + items > s.maxItems) return false;
+      // デポチェック：ドライバーのデポが設定されていて、店舗のデポも設定されている場合のみ絞り込む
       const dDepot = s.driver.depot || '';
-      if (!locDepot || !dDepot || dDepot === 'both') return true;
-      const dCode = dDepot === 'kobe' ? '2806' : dDepot === 'tamba' ? '2805' : dDepot;
-      return dCode === locDepot;
-    };
+      if (locDepot && dDepot && dDepot !== 'both') {
+        // kobe→2806, tamba→2805 に変換して比較
+        const dCode = dDepot === 'kobe' ? '2806' : dDepot === 'tamba' ? '2805' : dDepot;
+        if (dCode !== locDepot) return false;
+      }
+      return true;
+    });
+    if (capable.length === 0) return; // 積めるドライバーなし → 未割当
 
-    // コース一致チェック（1便・2便）：積載も便ごとに独立してチェック
-    const bin1Match = driverState.filter(s =>
-      depotOk(s) &&
-      s.driver.courses && s.driver.courses.length > 0 &&
-      s.driver.courses.map(normCourse).includes(locCourse) &&
-      s.usedVol1 + vol <= s.maxVol &&
-      s.usedItems1 + items <= s.maxItems
+    // コース一致チェック（1便・2便）
+    const bin1Match = capable.filter(s =>
+      s.driver.courses && s.driver.courses.length > 0 && s.driver.courses.includes(locCourse)
     );
-    const bin2Match = driverState.filter(s =>
-      depotOk(s) &&
-      s.driver.coursesBin2 && s.driver.coursesBin2.length > 0 &&
-      s.driver.coursesBin2.map(normCourse).includes(locCourse) &&
-      s.usedVol2 + vol <= s.maxVol &&
-      s.usedItems2 + items <= s.maxItems
+    const bin2Match = capable.filter(s =>
+      s.driver.coursesBin2 && s.driver.coursesBin2.length > 0 && s.driver.coursesBin2.includes(locCourse)
     );
 
-    // 候補と便番号を決定（コース一致なし → 未割当）
+    // 候補と便番号を決定
     let candidates, binNum;
     if (bin1Match.length > 0) {
       candidates = bin1Match; binNum = 1;
     } else if (bin2Match.length > 0) {
       candidates = bin2Match; binNum = 2;
     } else {
-      return; // コース一致なし → 未割当
+      candidates = capable; binNum = 1;
     }
 
-    // スコア計算：地理的距離
+    // スコア計算：地理的距離（コース一致は既に候補を絞り込んでいる）
     let best = null;
     let bestScore = Infinity;
     candidates.forEach(s => {
@@ -1791,9 +1794,8 @@ function autoAssign() {
 
     if (best) {
       assignments[i] = { driverId: best.driver.id, bin: binNum };
-      // 便ごとのカウンターに加算
-      if (binNum === 1) { best.usedVol1 += vol; best.usedItems1 += items; }
-      else              { best.usedVol2 += vol; best.usedItems2 += items; }
+      best.usedVol   += vol;
+      best.usedItems += items;
       best.assigned.push(loc);
     }
   });
@@ -2018,15 +2020,9 @@ function renderRightSidebar() {
         .map(loc => ({ loc, i: locations.indexOf(loc) }))
         .filter(({ i }) => i >= 0 && assignments[i] && assignments[i].driverId === activeDriverFilter);
     } else {
-      // ルート未表示時は便→stop_order順で表示
+      // ルート未表示時は割り当て順で表示
       locs = locations.map((loc, i) => ({loc, i}))
-        .filter(({i}) => assignments[i] && assignments[i].driverId === activeDriverFilter)
-        .sort((a, b) => {
-          const binA = assignments[a.i]?.bin || 1;
-          const binB = assignments[b.i]?.bin || 1;
-          if (binA !== binB) return binA - binB;
-          return (a.loc.stop_order || 0) - (b.loc.stop_order || 0);
-        });
+        .filter(({i}) => assignments[i] && assignments[i].driverId === activeDriverFilter);
     }
   } else {
     title.textContent = '配送先リスト';
@@ -2067,10 +2063,12 @@ function renderRightSidebar() {
     const dName = driverIdx >= 0 ? drivers[driverIdx].name : '未割当';
     const bin = asgn ? `第${asgn.bin}便` : '';
 
-    // 番号表示：未割当フィルター以外は常に表示（地図ピンと一致）
+    // 番号表示：ルート表示後のみ表示（地図ピンと一致させる）
     let stopNumStr = '';
-    if (activeDriverFilter !== 'unassigned') {
-      stopNumStr = String(loopIdx + 1);
+    if (activeDriverFilter === 'unassigned') {
+      stopNumStr = ''; // 未割当フィルターは番号なし
+    } else if (orderedLocations.length > 0) {
+      stopNumStr = String(loopIdx + 1); // ルート表示後：ループ順（地図ピンと一致）
     }
     card.innerHTML = `
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;">
@@ -2079,8 +2077,7 @@ function renderRightSidebar() {
             ${stopNumStr ? `<span style="background:${color};color:white;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:bold;flex-shrink:0;">${stopNumStr}</span>` : ''}
             <span style="font-weight:600;color:rgba(255,255,255,0.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${loc.name}</span>
           </div>
-          <div style="font-size:10px;color:rgba(255,255,255,0.35);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:${stopNumStr?'20px':'0'};">${loc.addr}</div>
-          <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px;display:flex;gap:6px;padding-left:${stopNumStr?'20px':'0'};">
+          <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:1px;display:flex;gap:6px;padding-left:${stopNumStr?'20px':'0'};">
             ${loc.items ? `<span>📦${loc.items}個</span>` : ''}
             ${loc.vol   ? `<span>📐${Number(loc.vol).toFixed(1)}才</span>` : ''}
             ${asgn ? `<span style="color:${color};">${dName} ${bin}</span>` : '<span style="color:#f59e0b;">未割当</span>'}
@@ -2180,7 +2177,10 @@ function renderDriverSidebar() {
   const unBtn = document.createElement('div');
   unBtn.className = 'driver-sb-card' + (activeDriverFilter === 'unassigned' ? ' active' : '');
   unBtn.style.borderLeft = '3px solid #f59e0b';
-  unBtn.innerHTML = `<div style="display:flex;align-items:center;"><span class="driver-sb-dot" style="background:#f59e0b;"></span><span class="driver-sb-name">未割当</span></div><div class="driver-sb-meta">${unassignedCount}件未割当</div>`;
+  const unassignedLocs = locations.filter((_, i) => !assignments[i]);
+  const unassignedItems = unassignedLocs.reduce((s, l) => s + (Number(l.items) || 0), 0);
+  const unassignedVol   = unassignedLocs.reduce((s, l) => s + (Number(l.vol)   || 0), 0);
+  unBtn.innerHTML = `<div style="display:flex;align-items:center;"><span class="driver-sb-dot" style="background:#f59e0b;"></span><span class="driver-sb-name">未割当</span></div><div class="driver-sb-meta">${unassignedCount}件 / ${unassignedItems}個 / ${unassignedVol.toFixed(1)}才</div>`;
   unBtn.onclick = () => {
     activeDriverFilter = 'unassigned';
     routeLines.forEach(({line}) => line.setMap(null));
