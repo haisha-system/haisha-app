@@ -287,9 +287,8 @@
 
 <!-- 配車割り当てパネル -->
 <div id="assign-panel" class="panel">
-  <h2>🚛 配車割り当て</h2>
   <div id="assign-summary"></div>
-  <div id="assign-content"></div>
+  <div id="assign-content" style="display:none;"></div>
   <div class="assign-actions">
     <button class="btn-auto"       onclick="autoAssign()">⚡ 自動配車</button>
     <button class="btn-export-all" onclick="exportAllDrivers()">📥 全員分Excel出力</button>
@@ -2223,7 +2222,8 @@ function renderDriverSidebar() {
     card.className = 'driver-sb-card' + (activeDriverFilter === driver.id ? ' active' : '');
     card.style.borderLeft = `3px solid ${color}`;
     if (driver.yoizumiToday) card.style.background = 'rgba(139,92,246,0.15)';
-    card.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;"><div style="display:flex;align-items:center;"><span class="driver-sb-dot" style="background:${color};"></span><span class="driver-sb-name">${driver.name}</span>${driver.yoizumiToday?'<span style="font-size:10px;margin-left:4px;">🌙</span>':''}</div><span style="font-size:10px;color:rgba(255,255,255,0.4);">${driver.code||''}</span></div><div class="driver-sb-meta">${myLocs.length}件 / ${myItems}個</div>`;
+    const myVol = myLocs.reduce((s, l) => s + (Number(l.vol) || 0), 0);
+    card.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;"><div style="display:flex;align-items:center;"><span class="driver-sb-dot" style="background:${color};"></span><span class="driver-sb-name">${driver.name}</span>${driver.yoizumiToday?'<span style="font-size:10px;margin-left:4px;">🌙</span>':''}</div><span style="font-size:10px;color:rgba(255,255,255,0.4);">${driver.code||''}</span></div><div class="driver-sb-meta">${myLocs.length}件 / ${myItems}個 / ${myVol.toFixed(1)}才</div>`;
     // ドロップゾーン設定
     card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('drop-target'); });
     card.addEventListener('dragleave', () => card.classList.remove('drop-target'));
