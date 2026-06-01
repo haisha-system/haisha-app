@@ -1720,47 +1720,51 @@ function autoAssign() {
     .map((loc, i) => ({ loc, i, vol: Number(loc.vol) || 0, items: Number(loc.items) || 0 }))
     .sort((a, b) => b.vol !== a.vol ? b.vol - a.vol : b.items - a.items);
 
-  // 各ドライバーの現在の積載状況
+  // 各ドライバーの現在の積載状況（1便・2便それぞれ独立したカウンター）
+  const normCourse = c => String(c || '').trim().replace(/^'+/, '').padStart(2, '0');
   const driverState = activeDrivers.map(d => {
     const limits = getDriverLimits(d);
-    return { driver: d, usedVol: 0, usedItems: 0, maxVol: limits.maxVol, maxItems: limits.maxItems, assigned: [] };
+    return {
+      driver: d,
+      // 1便カウンター
+      usedVol1: 0, usedItems1: 0,
+      // 2便カウンター
+      usedVol2: 0, usedItems2: 0,
+      maxVol: limits.maxVol, maxItems: limits.maxItems,
+      assigned: []
+    };
   });
 
   // 割り当てループ
   sorted.forEach(({ loc, i, vol, items }) => {
-    // コース番号をゼロ埋め2桁に統一するヘルパー
-    const normCourse = c => String(c || '').trim().replace(/^'+/, '').padStart(2, '0');
     const locCourse = normCourse(loc.course);
     const locDepot  = (loc.depotCode || '').trim().replace(/^'+/, '');
 
-    // このlocを積める（積載上限内の）ドライバーを絞り込む
-    let capable = driverState.filter(s => {
-      // 積載チェック
-      if (s.usedVol + vol > s.maxVol) return false;
-      if (s.usedItems + items > s.maxItems) return false;
-      // デポチェック：ドライバーのデポが設定されていて、店舗のデポも設定されている場合のみ絞り込む
+    // デポ絞り込み
+    const depotOk = s => {
       const dDepot = s.driver.depot || '';
-      if (locDepot && dDepot && dDepot !== 'both') {
-        // kobe→2806, tamba→2805 に変換して比較
-        const dCode = dDepot === 'kobe' ? '2806' : dDepot === 'tamba' ? '2805' : dDepot;
-        if (dCode !== locDepot) return false;
-      }
-      return true;
-    });
-    if (capable.length === 0) return; // 積めるドライバーなし → 未割当
+      if (!locDepot || !dDepot || dDepot === 'both') return true;
+      const dCode = dDepot === 'kobe' ? '2806' : dDepot === 'tamba' ? '2805' : dDepot;
+      return dCode === locDepot;
+    };
 
-    // コース一致チェック（1便・2便）：両方ゼロ埋め2桁で比較
-    const bin1Match = capable.filter(s =>
+    // コース一致チェック（1便・2便）：積載も便ごとに独立してチェック
+    const bin1Match = driverState.filter(s =>
+      depotOk(s) &&
       s.driver.courses && s.driver.courses.length > 0 &&
-      s.driver.courses.map(normCourse).includes(locCourse)
+      s.driver.courses.map(normCourse).includes(locCourse) &&
+      s.usedVol1 + vol <= s.maxVol &&
+      s.usedItems1 + items <= s.maxItems
     );
-    const bin2Match = capable.filter(s =>
+    const bin2Match = driverState.filter(s =>
+      depotOk(s) &&
       s.driver.coursesBin2 && s.driver.coursesBin2.length > 0 &&
-      s.driver.coursesBin2.map(normCourse).includes(locCourse)
+      s.driver.coursesBin2.map(normCourse).includes(locCourse) &&
+      s.usedVol2 + vol <= s.maxVol &&
+      s.usedItems2 + items <= s.maxItems
     );
 
-    // 候補と便番号を決定
-    // コース設定なし・一致なし → どちらも未割当
+    // 候補と便番号を決定（コース一致なし → 未割当）
     let candidates, binNum;
     if (bin1Match.length > 0) {
       candidates = bin1Match; binNum = 1;
@@ -1770,7 +1774,7 @@ function autoAssign() {
       return; // コース一致なし → 未割当
     }
 
-    // スコア計算：地理的距離（コース一致は既に候補を絞り込んでいる）
+    // スコア計算：地理的距離
     let best = null;
     let bestScore = Infinity;
     candidates.forEach(s => {
@@ -1787,8 +1791,9 @@ function autoAssign() {
 
     if (best) {
       assignments[i] = { driverId: best.driver.id, bin: binNum };
-      best.usedVol   += vol;
-      best.usedItems += items;
+      // 便ごとのカウンターに加算
+      if (binNum === 1) { best.usedVol1 += vol; best.usedItems1 += items; }
+      else              { best.usedVol2 += vol; best.usedItems2 += items; }
       best.assigned.push(loc);
     }
   });
