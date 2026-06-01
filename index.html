@@ -749,6 +749,7 @@ function initMap() {
         });
         // 問題C修正：locations件数に関わらず必ずサイドバーを更新する
         updateSidebar(locations, false);
+        renderDepotFilterBtns();
         renderDriverSidebar();
         renderRightSidebar();
         if (locations.length > 0) {
@@ -2389,6 +2390,7 @@ function processExcelData(rows, rowsRaw) {
     });
     document.getElementById('status').textContent=`${locations.length}件を表示しました`;
     updateSidebar(locations,false);
+    renderDepotFilterBtns();
     renderDriverSidebar();
     renderRightSidebar();
     saveLocationsToSession();
