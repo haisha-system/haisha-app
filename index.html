@@ -951,8 +951,8 @@ function loadCSV(file) {
         const addr = cols[addrIdx] || '';
         const items = parseFloat(cols[itemIdx]) || 0;
         const vol   = parseFloat(cols[volIdx])   || 0;
-        const course = courseIdx >= 0 ? (cols[courseIdx] || '').trim() : '';
-        const depotCode = depotCodeIdx >= 0 ? (cols[depotCodeIdx]||'').trim() : '';
+        const course = courseIdx >= 0 ? (cols[courseIdx] || '').trim().replace(/^'+/, '') : '';
+        const depotCode = depotCodeIdx >= 0 ? (cols[depotCodeIdx]||'').trim().replace(/^'+/, '') : '';
 
         if (!name.trim() || !addr.trim()) return;
 
@@ -1052,10 +1052,7 @@ function loadCSV(file) {
           savedStores[shop.code].name = shop.name;
           savedStores[shop.code].addr = shop.addr;
           savedStores[shop.code].course = shop.course || savedStores[shop.code].course || '';
-          // デポは「手動設定済み（depotManual=true）」でない場合のみCSVの値で更新する
-          if (shop.depotCode && !savedStores[shop.code].depotManual) {
-            savedStores[shop.code].depot = shop.depotCode;
-          }
+          if (shop.depotCode) savedStores[shop.code].depot = shop.depotCode;
         });
         try { localStorage.setItem('haisha_stores', JSON.stringify(savedStores)); } catch(e) {}
 
