@@ -951,7 +951,7 @@ function loadCSV(file) {
         const addr = cols[addrIdx] || '';
         const items = parseFloat(cols[itemIdx]) || 0;
         const vol   = parseFloat(cols[volIdx])   || 0;
-        const course = courseIdx >= 0 ? (cols[courseIdx] || '').trim().replace(/^'+/, '') : '';
+        const course = courseIdx >= 0 ? (cols[courseIdx] || '').trim().replace(/^'+/, '').padStart(2, '0') : '';
         const depotCode = depotCodeIdx >= 0 ? (cols[depotCodeIdx]||'').trim().replace(/^'+/, '') : '';
 
         if (!name.trim() || !addr.trim()) return;
@@ -1728,8 +1728,10 @@ function autoAssign() {
 
   // 割り当てループ
   sorted.forEach(({ loc, i, vol, items }) => {
-    const locCourse = (loc.course || '').trim();
-    const locDepot  = (loc.depotCode || '').trim();
+    // コース番号をゼロ埋め2桁に統一するヘルパー
+    const normCourse = c => String(c || '').trim().replace(/^'+/, '').padStart(2, '0');
+    const locCourse = normCourse(loc.course);
+    const locDepot  = (loc.depotCode || '').trim().replace(/^'+/, '');
 
     // このlocを積める（積載上限内の）ドライバーを絞り込む
     let capable = driverState.filter(s => {
@@ -1747,12 +1749,14 @@ function autoAssign() {
     });
     if (capable.length === 0) return; // 積めるドライバーなし → 未割当
 
-    // コース一致チェック（1便・2便）
+    // コース一致チェック（1便・2便）：両方ゼロ埋め2桁で比較
     const bin1Match = capable.filter(s =>
-      s.driver.courses && s.driver.courses.length > 0 && s.driver.courses.includes(locCourse)
+      s.driver.courses && s.driver.courses.length > 0 &&
+      s.driver.courses.map(normCourse).includes(locCourse)
     );
     const bin2Match = capable.filter(s =>
-      s.driver.coursesBin2 && s.driver.coursesBin2.length > 0 && s.driver.coursesBin2.includes(locCourse)
+      s.driver.coursesBin2 && s.driver.coursesBin2.length > 0 &&
+      s.driver.coursesBin2.map(normCourse).includes(locCourse)
     );
 
     // 候補と便番号を決定
