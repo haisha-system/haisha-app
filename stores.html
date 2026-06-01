@@ -283,7 +283,6 @@ function renderCourseFilterBar() {
   try { courseMap = JSON.parse(localStorage.getItem('haisha_courses') || '{}'); } catch(e) {}
   // 新旧両形式対応：文字列 or { name, depot }
   const _cn = num => { const v = courseMap[num]; if (!v) return ''; return typeof v === 'string' ? v : (v.name || ''); };
-  const _cn = (num) => { const v = courseMap[num]; if (!v) return ''; return typeof v === 'string' ? v : (v.name || ''); };
 
   const nums = [...courses].sort();
   bar.innerHTML = '';
