@@ -1760,13 +1760,14 @@ function autoAssign() {
     );
 
     // 候補と便番号を決定
+    // コース設定なし・一致なし → どちらも未割当
     let candidates, binNum;
     if (bin1Match.length > 0) {
       candidates = bin1Match; binNum = 1;
     } else if (bin2Match.length > 0) {
       candidates = bin2Match; binNum = 2;
     } else {
-      candidates = capable; binNum = 1;
+      return; // コース一致なし → 未割当
     }
 
     // スコア計算：地理的距離（コース一致は既に候補を絞り込んでいる）
