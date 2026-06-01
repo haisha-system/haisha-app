@@ -1052,7 +1052,10 @@ function loadCSV(file) {
           savedStores[shop.code].name = shop.name;
           savedStores[shop.code].addr = shop.addr;
           savedStores[shop.code].course = shop.course || savedStores[shop.code].course || '';
-          if (shop.depotCode) savedStores[shop.code].depot = shop.depotCode;
+          // デポは「手動設定済み（depotManual=true）」でない場合のみCSVの値で更新する
+          if (shop.depotCode && !savedStores[shop.code].depotManual) {
+            savedStores[shop.code].depot = shop.depotCode;
+          }
         });
         try { localStorage.setItem('haisha_stores', JSON.stringify(savedStores)); } catch(e) {}
 

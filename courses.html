@@ -56,6 +56,17 @@
     .btn-clr:hover { background: rgba(255,255,255,0.12); }
 
     .empty-msg { font-size: 13px; color: rgba(255,255,255,0.25); padding: 24px; text-align: center; }
+  .depot-badge {
+    font-size: 10px; padding: 2px 8px; border-radius: 3px; font-weight: 700; flex-shrink: 0;
+  }
+  .badge-kobe  { background: rgba(6,182,212,0.2); color: #06b6d4; }
+  .badge-tamba { background: rgba(167,139,250,0.2); color: #a78bfa; }
+  .badge-none  { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.3); }
+  .form-group select {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+    color: white; border-radius: 6px; padding: 8px 12px; font-size: 13px; font-family: inherit;
+  }
+  .form-group select:focus { outline: none; border-color: #f59e0b; }
     .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 10px 24px; border-radius: 20px; font-size: 13px; box-shadow: 0 2px 12px rgba(0,0,0,0.3); z-index: 999; display: none; }
 
     /* CSVインポートボタン */
@@ -97,6 +108,14 @@
           <label>コース名称（省略可）</label>
           <input type="text" id="new-name" placeholder="例：姫路エリア">
         </div>
+        <div class="form-group">
+          <label>担当デポ</label>
+          <select id="new-depot" style="background:#1e2d3d;">
+            <option value="" style="background:#1e2d3d;">-- 未設定 --</option>
+            <option value="2806" style="background:#1e2d3d;">🏭 神戸西デポ（2806）</option>
+            <option value="2805" style="background:#1e2d3d;">🏭 丹波デポ（2805）</option>
+          </select>
+        </div>
         <div class="form-actions">
           <button class="btn-add" onclick="saveCourse()">＋ 登録</button>
           <button class="btn-clr" onclick="clearForm()">クリア</button>
@@ -109,18 +128,41 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const STORAGE_KEY = 'haisha_courses'; // { '01': '姫路エリア', '02': '' ... }
+const STORAGE_KEY = 'haisha_courses';
+// 新形式: { '01': { name:'姫路エリア', depot:'2806' }, ... }
+// 旧形式: { '01': '姫路エリア', ... } も読み込み時に変換
 let courses = {};
 
 function loadCourses() {
   try {
     const d = localStorage.getItem(STORAGE_KEY);
-    if (d) courses = JSON.parse(d);
+    if (d) {
+      const raw = JSON.parse(d);
+      // 旧形式（文字列）を新形式（オブジェクト）に変換
+      Object.keys(raw).forEach(k => {
+        if (typeof raw[k] === 'string') {
+          raw[k] = { name: raw[k], depot: '' };
+        }
+      });
+      courses = raw;
+    }
   } catch(e) { courses = {}; }
 }
 
 function saveCourses() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(courses));
+}
+
+// コース名・デポを取得するヘルパー（新旧形式対応）
+function getCourseName(num) {
+  const c = courses[num];
+  if (!c) return '';
+  return typeof c === 'string' ? c : (c.name || '');
+}
+function getCourseDepot(num) {
+  const c = courses[num];
+  if (!c) return '';
+  return typeof c === 'string' ? '' : (c.depot || '');
 }
 
 function renderList() {
@@ -132,12 +174,16 @@ function renderList() {
   }
   el.innerHTML = '';
   nums.forEach(num => {
-    const name = courses[num] || '';
+    const name = getCourseName(num);
     const row = document.createElement('div');
     row.className = 'course-row';
+    const depot = getCourseDepot(num);
+    const depotLabel = depot === '2806' ? '🏭神戸西' : depot === '2805' ? '🏭丹波' : '';
+    const depotClass = depot === '2806' ? 'badge-kobe' : depot === '2805' ? 'badge-tamba' : 'badge-none';
     row.innerHTML = `
       <div class="course-num">${num}</div>
       <div class="course-name ${name ? '' : 'empty'}">${name || '（名称未設定）'}</div>
+      ${depotLabel ? `<span class="depot-badge ${depotClass}">${depotLabel}</span>` : ''}
       <div class="course-actions">
         <button class="btn-edit" onclick="editCourse('${num}')">編集</button>
         <button class="btn-del" onclick="deleteCourse('${num}')">削除</button>
@@ -152,12 +198,12 @@ function saveCourse() {
   const name = document.getElementById('new-name').value.trim();
   if (!num) { alert('コース番号は必須です'); return; }
 
+  const depot = document.getElementById('new-depot') ? document.getElementById('new-depot').value : '';
   const editNum = document.getElementById('form-title').dataset.editNum;
   if (editNum && editNum !== num) {
-    // 番号が変わった場合は古いものを削除
     delete courses[editNum];
   }
-  courses[num] = name;
+  courses[num] = { name: name, depot: depot };
   saveCourses();
   renderList();
   clearForm();
@@ -166,7 +212,9 @@ function saveCourse() {
 
 function editCourse(num) {
   document.getElementById('new-num').value  = num;
-  document.getElementById('new-name').value = courses[num] || '';
+  document.getElementById('new-name').value = getCourseName(num);
+  const depotEl = document.getElementById('new-depot');
+  if (depotEl) depotEl.value = getCourseDepot(num);
   document.getElementById('form-title').textContent = '編集: ' + num;
   document.getElementById('form-title').dataset.editNum = num;
 }
@@ -182,6 +230,8 @@ function deleteCourse(num) {
 function clearForm() {
   document.getElementById('new-num').value  = '';
   document.getElementById('new-name').value = '';
+  const depotClr = document.getElementById('new-depot');
+  if (depotClr) depotClr.value = '';
   document.getElementById('form-title').textContent = '新規登録';
   document.getElementById('form-title').dataset.editNum = '';
 }
@@ -198,9 +248,23 @@ function importFromStores() {
       alert('店舗データにコース番号が見つかりません。\nCSVを読み込んでから再試行してください。');
       return;
     }
+    // 店舗データからコースごとのデポも収集
+    const courseDepotMap = {};
+    Object.values(stores).forEach(s => {
+      if (s.course && s.course.trim() && s.depot) {
+        courseDepotMap[s.course.trim()] = s.depot;
+      }
+    });
     let added = 0;
     found.forEach(num => {
-      if (!courses[num]) { courses[num] = ''; added++; }
+      if (!courses[num]) {
+        courses[num] = { name: '', depot: courseDepotMap[num] || '' };
+        added++;
+      } else if (!getCourseDepot(num) && courseDepotMap[num]) {
+        // 既存コースにデポが未設定なら補完
+        if (typeof courses[num] === 'string') courses[num] = { name: courses[num], depot: courseDepotMap[num] };
+        else courses[num].depot = courseDepotMap[num];
+      }
     });
     saveCourses();
     renderList();

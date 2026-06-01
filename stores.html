@@ -550,9 +550,13 @@ function saveCurrentStore() {
 
   if (!name || !addr) { showToast('店舗名と住所は必須です', true); return; }
 
+  // 元のdepotと比べて変更があれば「手動設定済み」フラグを立てる
+  const prevDepot = stores[currentCode]?.depot || '';
+  const depotManual = depot !== '' && (stores[currentCode]?.depotManual || depot !== prevDepot);
   stores[currentCode] = {
     ...stores[currentCode],
     name, addr, course, depot,
+    depotManual: depotManual,
     customLat: isNaN(lat) ? null : lat,
     customLng: isNaN(lng) ? null : lng,
     hasCustom: !isNaN(lat) && !isNaN(lng)
@@ -591,8 +595,35 @@ function showToast(msg, isError = false) {
 // 初期化
 // ====================================================
 loadStores();
+// デポ未設定の店舗をコース情報から自動補完（手動設定済みはスキップ）
+autoFillDepotFromCourses();
 renderCourseFilterBar();
 renderList();
+
+function autoFillDepotFromCourses() {
+  // courses.htmlで管理しているコース→デポ対応を読み込む
+  let courseMap = {};
+  try {
+    const raw = JSON.parse(localStorage.getItem('haisha_courses') || '{}');
+    Object.keys(raw).forEach(k => {
+      const v = raw[k];
+      courseMap[k] = typeof v === 'string' ? '' : (v.depot || '');
+    });
+  } catch(e) {}
+
+  let updated = false;
+  Object.keys(stores).forEach(code => {
+    const s = stores[code];
+    // 手動設定済みはスキップ
+    if (s.depotManual) return;
+    // デポが未設定でコース番号がある場合のみ補完
+    if (!s.depot && s.course && courseMap[s.course.trim()]) {
+      stores[code].depot = courseMap[s.course.trim()];
+      updated = true;
+    }
+  });
+  if (updated) saveStores();
+}
 </script>
 </body>
 </html>
