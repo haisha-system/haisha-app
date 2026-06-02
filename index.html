@@ -47,7 +47,7 @@
     }
     /* 右サイドバー：配送先リスト */
     #sidebar-right {
-      width: 570px; background: #161f2c;
+      width: 620px; background: #161f2c;
       border-left: 1px solid rgba(255,255,255,0.08);
       overflow-y: auto; padding: 10px;
       flex-shrink: 0;
@@ -2023,18 +2023,13 @@ function renderRightSidebar() {
   } else if (activeDriverFilter !== null) {
     const driver = drivers.find(d => d.id === activeDriverFilter);
     title.textContent = `${driver ? driver.name : '不明'} の配送先`;
-    if (orderedLocations.length > 0) {
-      locs = orderedLocations
-        .map(loc => ({ loc, i: locations.indexOf(loc) }))
-        .filter(({ i }) => i >= 0 && assignments[i] && assignments[i].driverId === activeDriverFilter);
-    } else {
-      locs = locations.map((loc, i) => ({loc, i}))
-        .filter(({i}) => assignments[i] && assignments[i].driverId === activeDriverFilter)
-        .sort((a, b) => {
-          const ba = assignments[a.i]?.bin || 1, bb = assignments[b.i]?.bin || 1;
-          return ba !== bb ? ba - bb : (a.loc.stop_order||0) - (b.loc.stop_order||0);
-        });
-    }
+    // 常にassignmentsから直接取る（orderedLocationsは全員分混在のため使わない）
+    locs = locations.map((loc, i) => ({loc, i}))
+      .filter(({i}) => assignments[i] && assignments[i].driverId === activeDriverFilter)
+      .sort((a, b) => {
+        const ba = assignments[a.i]?.bin || 1, bb = assignments[b.i]?.bin || 1;
+        return ba !== bb ? ba - bb : (a.loc.stop_order||0) - (b.loc.stop_order||0);
+      });
   } else {
     title.textContent = '配送先リスト';
     locs = orderedLocations.length > 0
