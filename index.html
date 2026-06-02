@@ -2033,9 +2033,7 @@ function renderRightSidebar() {
       });
   } else {
     title.textContent = '配送先リスト';
-    locs = orderedLocations.length > 0
-      ? orderedLocations.map(loc => ({loc, i: locations.indexOf(loc)})).filter(({i}) => i >= 0)
-      : locations.map((loc, i) => ({loc, i}));
+    locs = locations.map((loc, i) => ({loc, i}));
   }
 
   el.innerHTML = '';
@@ -2237,7 +2235,7 @@ function renderDriverSidebar() {
     const unBtn = document.createElement('div');
     unBtn.className = 'driver-sb-card' + (activeDriverFilter === filter ? ' active' : '');
     unBtn.style.borderLeft = `3px solid ${depotColor}`;
-    unBtn.innerHTML = `<span class="driver-sb-dot" style="background:${depotColor};"></span><span class="driver-sb-name">${label}</span><span class="driver-sb-meta">${unLocs.length}件/${unItems}個/${unVol.toFixed(0)}才</span>`;
+    unBtn.innerHTML = `<span class="driver-sb-dot" style="background:${depotColor};"></span><div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:700;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${label}</div><div style="font-size:10px;color:rgba(255,255,255,0.4);">${unLocs.length}件/${unItems}個/${unVol.toFixed(0)}才</div></div>`;
     unBtn.onclick = () => {
       activeDriverFilter = filter;
       routeLines.forEach(({line}) => line.setMap(null));
