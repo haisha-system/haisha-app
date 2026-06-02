@@ -1576,6 +1576,7 @@ function filterRouteByDriver(driverId) {
     document.getElementById('status').textContent = '全ドライバーのルートを表示しました';
   } else {
     activeDriverFilter = driverId;
+    orderedLocations = []; // ドライバー選択時は全件orderedをクリア
     routeLines.forEach(({line, driverId: rid}) => {
       line.setMap(rid === driverId || rid === null ? map : null);
     });
