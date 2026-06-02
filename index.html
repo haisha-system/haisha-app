@@ -2014,9 +2014,12 @@ function renderRightSidebar() {
   if (!el) return;
 
   let locs;
-  if (activeDriverFilter === 'unassigned') {
-    title.textContent = '未割当の配送先';
-    locs = locations.map((loc, i) => ({loc, i})).filter(({i}) => !assignments[i]);
+  if (activeDriverFilter === 'unassigned' || activeDriverFilter?.startsWith('unassigned_')) {
+    const depotCode = activeDriverFilter?.startsWith('unassigned_') ? activeDriverFilter.replace('unassigned_','') : null;
+    const depotLabel = depotCode === '2806' ? '神戸西' : depotCode === '2805' ? '丹波' : '';
+    title.textContent = depotLabel ? `${depotLabel} 未割当` : '未割当の配送先';
+    locs = locations.map((loc, i) => ({loc, i}))
+      .filter(({loc, i}) => !assignments[i] && (!depotCode || (loc.depotCode || '') === depotCode));
   } else if (activeDriverFilter !== null) {
     const driver = drivers.find(d => d.id === activeDriverFilter);
     title.textContent = `${driver ? driver.name : '不明'} の配送先`;
@@ -2225,40 +2228,43 @@ function renderDriverSidebar() {
   };
   el.appendChild(allBtn);
 
-  // 未割当ボタン
-  const unassignedCount = locations.filter((_,i) => !assignments[i]).length;
-  const unBtn = document.createElement('div');
-  unBtn.className = 'driver-sb-card' + (activeDriverFilter === 'unassigned' ? ' active' : '');
-  unBtn.style.borderLeft = '3px solid #f59e0b';
-  const unassignedLocs = locations.filter((_, i) => !assignments[i]);
-  const unassignedItems = unassignedLocs.reduce((s, l) => s + (Number(l.items) || 0), 0);
-  const unassignedVol   = unassignedLocs.reduce((s, l) => s + (Number(l.vol)   || 0), 0);
-  unBtn.innerHTML = `<span class="driver-sb-dot" style="background:#f59e0b;"></span><span class="driver-sb-name">未割当</span><span class="driver-sb-meta">${unassignedCount}件/${unassignedItems}個/${unassignedVol.toFixed(0)}才</span>`;
-  unBtn.onclick = () => {
-    activeDriverFilter = 'unassigned';
-    routeLines.forEach(({line}) => line.setMap(null));
-    markers.forEach(m => m.setMap(null));
-    markers = [];
-    // 未割当のピンを表示
-    const unLocs = locations.filter((_, i) => !assignments[i]);
-    unLocs.forEach((loc, idx) => {
-      const marker = new google.maps.Marker({
-        position:{lat:loc.lat,lng:loc.lng}, map, title:loc.name,
-        label:{text:String(idx+1),color:'white',fontSize:'11px',fontWeight:'bold'},
-        icon:{path:google.maps.SymbolPath.CIRCLE,scale:14,fillColor:'#f59e0b',fillOpacity:1,strokeColor:'#fff',strokeWeight:2}
+  // 未割当ボタン（デポ別）
+  const DEPOT_LIST = [
+    { code: '2806', label: '神戸西 未割当', color: '#06b6d4', filter: 'unassigned_2806' },
+    { code: '2805', label: '丹波 未割当',   color: '#a78bfa', filter: 'unassigned_2805' },
+  ];
+  DEPOT_LIST.forEach(({ code, label, color: depotColor, filter }) => {
+    const unLocs = locations.filter((_, i) => !assignments[i] && (locations[i]?.depotCode || '') === code);
+    if (unLocs.length === 0) return;
+    const unItems = unLocs.reduce((s, l) => s + (Number(l.items) || 0), 0);
+    const unVol   = unLocs.reduce((s, l) => s + (Number(l.vol)   || 0), 0);
+    const unBtn = document.createElement('div');
+    unBtn.className = 'driver-sb-card' + (activeDriverFilter === filter ? ' active' : '');
+    unBtn.style.borderLeft = `3px solid ${depotColor}`;
+    unBtn.innerHTML = `<span class="driver-sb-dot" style="background:${depotColor};"></span><span class="driver-sb-name">${label}</span><span class="driver-sb-meta">${unLocs.length}件/${unItems}個/${unVol.toFixed(0)}才</span>`;
+    unBtn.onclick = () => {
+      activeDriverFilter = filter;
+      routeLines.forEach(({line}) => line.setMap(null));
+      markers.forEach(m => m.setMap(null));
+      markers = [];
+      unLocs.forEach((loc, idx) => {
+        const marker = new google.maps.Marker({
+          position:{lat:loc.lat,lng:loc.lng}, map, title:loc.name,
+          label:{text:String(idx+1),color:'white',fontSize:'11px',fontWeight:'bold'},
+          icon:{path:google.maps.SymbolPath.CIRCLE,scale:14,fillColor:depotColor,fillOpacity:1,strokeColor:'#fff',strokeWeight:2}
+        });
+        marker.addListener('click', () => {
+          highlightStopCard(locations.indexOf(loc));
+          new google.maps.InfoWindow({content:`<b>${loc.name}</b><br><small>${loc.addr}</small>`}).open(map, marker);
+        });
+        markers.push(marker);
       });
-      marker.addListener('click', () => {
-        highlightStopCard(locations.indexOf(loc));
-        new google.maps.InfoWindow({content:`<b>${loc.name}</b><br><small>${loc.addr}</small>`}).open(map, marker);
-      });
-      markers.push(marker);
-    });
-// 地図範囲は変更しない
-    document.getElementById('status').textContent = `未割当: ${unassignedCount}件`;
-    renderDriverSidebar();
-    renderRightSidebar();
-  };
-  el.appendChild(unBtn);
+      document.getElementById('status').textContent = `${label}: ${unLocs.length}件`;
+      renderDriverSidebar();
+      renderRightSidebar();
+    };
+    el.appendChild(unBtn);
+  });
 
   // 各ドライバー（社員コード順）
   const sortedDrivers = [...activeDrivers].sort((a,b) => {
