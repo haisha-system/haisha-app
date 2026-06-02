@@ -2097,6 +2097,13 @@ function renderRightSidebar() {
       bins[bin].push({loc, i, idx});
     });
 
+    // 1便+2便の合計が13件超えたら全体を2列モードにする
+    const COL_LIMIT = 13;
+    const totalLocs = locs.length;
+    const use2col = totalLocs > COL_LIMIT;
+    let globalIdx = 0; // 全便通しの連番（左右振り分け用）
+    const allCards = []; // 全カードを一旦収集
+
     Object.keys(bins).map(Number).sort((a,b)=>a-b).forEach(binNum => {
       const binLocs = bins[binNum];
       const binItems = binLocs.reduce((s,{loc})=>s+(Number(loc.items)||0),0);
@@ -2106,29 +2113,34 @@ function renderRightSidebar() {
       const header = document.createElement('div');
       header.style.cssText = `font-size:10px;font-weight:700;color:${color};margin:6px 0 3px;padding:2px 6px;background:${color}22;border-radius:3px;border-left:2px solid ${color};`;
       header.textContent = `第${binNum}便  ${binLocs.length}件 / ${binItems}個 / ${binVol.toFixed(0)}才`;
-      el.appendChild(header);
+      header.dataset.binHeader = '1';
 
-      // 13件超えたら左列13件→右列に折り返し
-      const COL_LIMIT = 13;
-      const use2col = binLocs.length > COL_LIMIT;
-      if (!use2col) {
-        binLocs.forEach(({loc, i, idx}) => el.appendChild(makeCard(loc, i, idx, color, false)));
-      } else {
-        const wrap = document.createElement('div');
-        wrap.style.cssText = 'display:flex;gap:4px;align-items:flex-start;';
-        const col1 = document.createElement('div');
-        col1.style.cssText = 'flex:1;min-width:0;';
-        const col2 = document.createElement('div');
-        col2.style.cssText = 'flex:1;min-width:0;';
-        binLocs.forEach(({loc, i, idx}, j) => {
-          const card = makeCard(loc, i, idx, color, true);
-          (j < COL_LIMIT ? col1 : col2).appendChild(card);
-        });
-        wrap.appendChild(col1);
-        wrap.appendChild(col2);
-        el.appendChild(wrap);
-      }
+      allCards.push({ el: header, isHeader: true });
+      binLocs.forEach(({loc, i, idx}) => {
+        allCards.push({ el: makeCard(loc, i, idx, color, use2col), isHeader: false });
+      });
     });
+
+    if (!use2col) {
+      allCards.forEach(({el: cardEl}) => el.appendChild(cardEl));
+    } else {
+      // 左列：1〜13件目（ヘッダー含む）、右列：14件目以降
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'display:flex;gap:4px;align-items:flex-start;';
+      const col1 = document.createElement('div'); col1.style.cssText = 'flex:1;min-width:0;';
+      const col2 = document.createElement('div'); col2.style.cssText = 'flex:1;min-width:0;';
+      let cardCount = 0; // ヘッダー除いた件数カウント
+      allCards.forEach(({el: cardEl, isHeader}) => {
+        if (cardCount < COL_LIMIT) {
+          col1.appendChild(cardEl);
+        } else {
+          col2.appendChild(cardEl);
+        }
+        if (!isHeader) cardCount++;
+      });
+      wrap.appendChild(col1); wrap.appendChild(col2);
+      el.appendChild(wrap);
+    }
     return;
   }
 
