@@ -40,7 +40,7 @@
     #map { flex: 1; }
     /* 左サイドバー：ドライバー一覧 */
     #sidebar-left {
-      width: 260px; background: #161f2c;
+      width: 280px; background: #161f2c;
       border-right: 1px solid rgba(255,255,255,0.08);
       overflow-y: auto; padding: 10px;
       flex-shrink: 0; display: flex; flex-direction: column;
@@ -2239,7 +2239,7 @@ function renderDriverSidebar() {
     const unBtn = document.createElement('div');
     unBtn.className = 'driver-sb-card' + (activeDriverFilter === filter ? ' active' : '');
     unBtn.style.borderLeft = `3px solid ${depotColor}`;
-    unBtn.innerHTML = `<span class="driver-sb-dot" style="background:${depotColor};"></span><div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:700;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${label}</div><div style="font-size:10px;color:rgba(255,255,255,0.4);">${unLocs.length}件/${unItems}個/${unVol.toFixed(0)}才</div></div>`;
+    unBtn.innerHTML = `<span class="driver-sb-dot" style="background:${depotColor};"></span><span class="driver-sb-name">${label}</span><span class="driver-sb-meta">${unLocs.length}件/${unItems}個/${unVol.toFixed(0)}才</span>`;
     unBtn.onclick = () => {
       activeDriverFilter = filter;
       routeLines.forEach(({line}) => line.setMap(null));
