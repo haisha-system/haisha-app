@@ -191,6 +191,18 @@
       <button class="filter-btn" onclick="setFilter('nocoord', this)">要確認</button>
       <button class="filter-btn" onclick="setFilter('auto', this)">自動</button>
     </div>
+    <div style="margin-top:8px;margin-bottom:2px;">
+      <button onclick="fetchAllTravelTimes()" style="background:rgba(6,182,212,0.15);border:1px solid rgba(6,182,212,0.3);color:#06b6d4;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-family:inherit;" id="fetch-travel-btn">
+        🕐 移動時間を一括取得
+      </button>
+      <span id="fetch-travel-status" style="font-size:11px;color:rgba(255,255,255,0.4);margin-left:10px;"></span>
+    </div>
+    <div style="margin-top:8px;margin-bottom:2px;">
+      <button onclick="fetchAllTravelTimes()" style="background:rgba(6,182,212,0.15);border:1px solid rgba(6,182,212,0.3);color:#06b6d4;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-family:inherit;" id="fetch-travel-btn">
+        🕐 移動時間を一括取得
+      </button>
+      <span id="fetch-travel-status" style="font-size:11px;color:rgba(255,255,255,0.4);margin-left:10px;"></span>
+    </div>
     <div class="filter-bar" style="margin-top:6px;flex-wrap:wrap;gap:4px;">
       <button class="filter-btn active" id="depot-all-btn" onclick="setDepotFilter('', this)">デポ:すべて</button>
       <button class="filter-btn" onclick="setDepotFilter('2806', this)">🏭 神戸西</button>
@@ -281,8 +293,6 @@ function renderCourseFilterBar() {
   // courses.htmlのラベルを取得
   let courseMap = {};
   try { courseMap = JSON.parse(localStorage.getItem('haisha_courses') || '{}'); } catch(e) {}
-  // 新旧両形式対応：文字列 or { name, depot }
-  const _cn = num => { const v = courseMap[num]; if (!v) return ''; return typeof v === 'string' ? v : (v.name || ''); };
 
   const nums = [...courses].sort();
   bar.innerHTML = '';
@@ -295,7 +305,7 @@ function renderCourseFilterBar() {
   bar.appendChild(allBtn);
 
   nums.forEach(num => {
-    const label = _cn(num) ? num + ' ' + _cn(num) : 'コース' + num;
+    const label = courseMap[num] ? num + ' ' + courseMap[num] : 'コース' + num;
     const btn = document.createElement('button');
     btn.className = 'course-filter-btn filter-btn';
     btn.textContent = label;
@@ -552,13 +562,9 @@ function saveCurrentStore() {
 
   if (!name || !addr) { showToast('店舗名と住所は必須です', true); return; }
 
-  // 元のdepotと比べて変更があれば「手動設定済み」フラグを立てる
-  const prevDepot = stores[currentCode]?.depot || '';
-  const depotManual = depot !== '' && (stores[currentCode]?.depotManual || depot !== prevDepot);
   stores[currentCode] = {
     ...stores[currentCode],
     name, addr, course, depot,
-    depotManual: depotManual,
     customLat: isNaN(lat) ? null : lat,
     customLng: isNaN(lng) ? null : lng,
     hasCustom: !isNaN(lat) && !isNaN(lng)
@@ -597,30 +603,86 @@ function showToast(msg, isError = false) {
 // 初期化
 // ====================================================
 loadStores();
-// デポ未設定の店舗をコース情報から自動補完（手動設定済みはスキップ）
-autoFillDepotFromCourses();
 renderCourseFilterBar();
 renderList();
 
-function autoFillDepotFromCourses() {
-  let courseMap2 = {};
-  try {
-    const raw = JSON.parse(localStorage.getItem('haisha_courses') || '{}');
-    Object.keys(raw).forEach(k => {
-      const v = raw[k];
-      courseMap2[k] = typeof v === 'string' ? '' : (v.depot || '');
-    });
-  } catch(e) {}
-  let updated = false;
-  Object.keys(stores).forEach(code => {
-    const s2 = stores[code];
-    if (s2.depotManual) return;
-    if (!s2.depot && s2.course && courseMap2[s2.course.trim()]) {
-      stores[code].depot = courseMap2[s2.course.trim()];
-      updated = true;
-    }
+// ====================================================
+// 移動時間キャッシュ（Google Distance Matrix API）
+// ====================================================
+const MAPS_KEY_DM = 'AIzaSyBP4DqTiYGVyDZv4mwguXoHYfcpHt4kO8E';
+const DEPOT_ORIGINS = {
+  '2806': { lat: 34.6717, lng: 135.1919 }, // 神戸西デポ
+  '2805': { lat: 35.1780, lng: 135.0270 }, // 丹波デポ
+};
+const TRAVEL_CACHE_KEY = 'haisha_travel_cache';
+
+async function fetchAllTravelTimes() {
+  const btn = document.getElementById('fetch-travel-btn');
+  const statusEl = document.getElementById('fetch-travel-status');
+  const codes = Object.keys(stores);
+  if (codes.length === 0) { statusEl.textContent = '店舗データがありません'; return; }
+
+  btn.disabled = true; btn.style.opacity = '0.5';
+  let cache = {};
+  try { cache = JSON.parse(localStorage.getItem(TRAVEL_CACHE_KEY) || '{}'); } catch(e) {}
+
+  // デポごとに店舗を分類
+  const byDepot = { '2806': [], '2805': [] };
+  codes.forEach(code => {
+    const s = stores[code];
+    if (!s.lat || !s.lng) return;
+    const rawDepot = s.depot || '2806';
+    const dCode = rawDepot === 'kobe' ? '2806' : rawDepot === 'tamba' ? '2805' : rawDepot;
+    if (byDepot[dCode]) byDepot[dCode].push({ code, lat: s.lat, lng: s.lng });
   });
-  if (updated) saveStores();
+
+  const BATCH = 25;
+  let done = 0;
+  const total = Object.values(byDepot).reduce((s, a) => s + a.length, 0);
+
+  for (const [depotCode, shopList] of Object.entries(byDepot)) {
+    if (shopList.length === 0) continue;
+    const origin = DEPOT_ORIGINS[depotCode];
+
+    for (let i = 0; i < shopList.length; i += BATCH) {
+      const batch = shopList.slice(i, i + BATCH);
+      const origStr = `${origin.lat},${origin.lng}`;
+      const destStr = batch.map(s => `${s.lat},${s.lng}`).join('|');
+      const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origStr)}&destinations=${encodeURIComponent(destStr)}&mode=driving&language=ja&key=${MAPS_KEY_DM}`;
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.status === 'OK' && data.rows && data.rows[0]) {
+          data.rows[0].elements.forEach((el, j) => {
+            if (el.status === 'OK') {
+              cache[batch[j].code] = {
+                duration_sec: el.duration.value,
+                distance_m: el.distance.value,
+                depot: depotCode,
+                updated: new Date().toISOString(),
+              };
+            }
+          });
+        } else {
+          console.warn('Distance Matrix:', data.status, data.error_message);
+          statusEl.textContent = `APIエラー: ${data.status}`;
+        }
+        done += batch.length;
+        statusEl.textContent = `取得中... ${done}/${total}件`;
+        await new Promise(r => setTimeout(r, 300));
+      } catch(e) {
+        console.error('fetch error:', e);
+        statusEl.textContent = `通信エラー: ${e.message}`;
+        break;
+      }
+    }
+  }
+
+  localStorage.setItem(TRAVEL_CACHE_KEY, JSON.stringify(cache));
+  btn.disabled = false; btn.style.opacity = '1';
+  const cached = Object.keys(cache).length;
+  statusEl.textContent = `✅ ${cached}件の移動時間を保存しました（最終更新: ${new Date().toLocaleTimeString('ja-JP')}）`;
 }
 </script>
 </body>

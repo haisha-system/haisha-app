@@ -304,6 +304,22 @@ function calcDist(a, b) {
   return Math.sqrt(dlat * dlat + dlng * dlng);
 }
 
+// 移動時間キャッシュを読み込む
+function loadTravelCache() {
+  try { return JSON.parse(localStorage.getItem('haisha_travel_cache') || '{}'); } catch(e) { return {}; }
+}
+
+// キャッシュから所要時間（分）を取得。なければ直線距離で計算
+function getTravelMin(fromLoc, toLoc, travelCache, speed, storeCode) {
+  // デポ→店舗の場合はキャッシュを使用
+  if (storeCode && travelCache[storeCode]) {
+    return Math.ceil(travelCache[storeCode].duration_sec / 60);
+  }
+  // キャッシュなしは直線距離
+  const dist = calcDist(fromLoc, toLoc);
+  return Math.ceil(dist / speed * 60);
+}
+
 function timeToMin(str) {
   const [h, m] = str.split(':').map(Number);
   return h * 60 + m;
@@ -332,6 +348,25 @@ function buildGantt() {
     return;
   }
 
+  // 移動時間キャッシュ読み込み
+  const travelCache = loadTravelCache();
+  const hasCacheData = Object.keys(travelCache).length > 0;
+
+  // 時間管理設定読み込み（stores.htmlの段階設定）
+  let timeSetting = null;
+  try { timeSetting = JSON.parse(localStorage.getItem('haisha_time_settings')); } catch(e) {}
+
+  // 段階設定から時間を求める関数
+  function getStepMin(items, steps, fallback) {
+    if (!steps || steps.length === 0) return fallback;
+    const n = Number(items) || 0;
+    for (const step of steps) {
+      if (n >= step.from && n <= step.to) return step.min;
+    }
+    // 範囲外は最大値を使う
+    return steps[steps.length - 1].min;
+  }
+
   // ドライバーごとに1便・2便の店舗リストを構築
   const driverSchedules = {};
   Object.entries(asgnRaw).forEach(([i, asgn]) => {
@@ -349,8 +384,10 @@ function buildGantt() {
     if (!driver) return;
     const depotKey = driver.depot === 'tamba' ? 'tamba' : 'kobe';
     const depot = DEPOT_COORDS[depotKey];
+    const depotCode = depotKey === 'tamba' ? '2805' : '2806';
     const events = [];
     let cur = { ...depot }, curMin = departMin;
+    let isFirstStop = true;
 
     ['bin1', 'bin2'].forEach((binKey, binIdx) => {
       const stops = bins[binKey];
@@ -358,8 +395,10 @@ function buildGantt() {
       const binNum = binIdx + 1;
       const totalItems = stops.reduce((s, l) => s + (Number(l.items) || 0), 0);
 
-      // 積み込み時間
-      const loadMin = Math.ceil(totalItems / 100 * loadPer100);
+      // 積み込み時間（段階設定 or フォームの値）
+      const loadMin = timeSetting
+        ? getStepMin(totalItems, timeSetting.loadSteps, Math.ceil(totalItems / 100 * loadPer100))
+        : Math.ceil(totalItems / 100 * loadPer100);
       if (loadMin > 0) {
         events.push({ type: 'load', bin: binNum, start: curMin, dur: loadMin, label: `積み込み ${totalItems}個`, items: totalItems });
         curMin += loadMin;
@@ -368,20 +407,31 @@ function buildGantt() {
       // デポ出発→各店舗
       stops.forEach(loc => {
         if (!loc.lat || !loc.lng) return;
-        const dist = calcDist(cur, { lat: loc.lat, lng: loc.lng });
-        const travelMin = Math.ceil(dist / speed * 60);
+        let travelMin;
+        if (isFirstStop && hasCacheData) {
+          // デポ→最初の店舗はキャッシュを使用
+          travelMin = getTravelMin(cur, { lat: loc.lat, lng: loc.lng }, travelCache, speed, loc.code);
+        } else {
+          // 店舗→店舗は直線距離
+          const dist = calcDist(cur, { lat: loc.lat, lng: loc.lng });
+          travelMin = Math.ceil(dist / speed * 60);
+        }
+        isFirstStop = false;
         if (travelMin > 0) {
           events.push({ type: 'travel', bin: binNum, start: curMin, dur: travelMin, label: '移動' });
           curMin += travelMin;
         }
         const items = Number(loc.items) || 0;
-        const unloadMin = unloadBase + Math.ceil(items / 10) * unloadPer10;
+        // 荷下ろし時間（段階設定 or フォームの値）
+        const unloadMin = timeSetting
+          ? getStepMin(items, timeSetting.unloadSteps, unloadBase + Math.ceil(items / 10) * unloadPer10)
+          : (unloadBase + Math.ceil(items / 10) * unloadPer10);
         events.push({ type: 'unload', bin: binNum, start: curMin, dur: unloadMin, label: loc.name, items });
         curMin += unloadMin;
         cur = { lat: loc.lat, lng: loc.lng };
       });
 
-      // デポ帰社
+      // 最終店舗→デポ帰社（キャッシュ対応：帰社は直線距離で計算）
       const returnDist = calcDist(cur, depot);
       const returnMin = Math.ceil(returnDist / speed * 60);
       if (returnMin > 0) {
@@ -389,6 +439,7 @@ function buildGantt() {
         curMin += returnMin;
       }
       cur = { ...depot };
+      isFirstStop = true; // 2便もデポ出発なのでリセット
     });
 
     schedules.push({ driver, events, endMin: curMin });
