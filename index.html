@@ -2019,8 +2019,8 @@ function renderRightSidebar() {
   if (!el) return;
 
   let locs;
-  if (activeDriverFilter === 'unassigned' || activeDriverFilter?.startsWith('unassigned_')) {
-    const depotCode = activeDriverFilter?.startsWith('unassigned_') ? activeDriverFilter.replace('unassigned_','') : null;
+  if (activeDriverFilter === 'unassigned' || (typeof activeDriverFilter === 'string' && activeDriverFilter.startsWith('unassigned_'))) {
+    const depotCode = (typeof activeDriverFilter === 'string' && activeDriverFilter.startsWith('unassigned_')) ? activeDriverFilter.replace('unassigned_','') : null;
     const depotLabel = depotCode === '2806' ? '神戸西' : depotCode === '2805' ? '丹波' : '';
     title.textContent = depotLabel ? `${depotLabel} 未割当` : '未割当の配送先';
     locs = locations.map((loc, i) => ({loc, i}))
