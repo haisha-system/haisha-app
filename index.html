@@ -1190,6 +1190,7 @@ function checkDone(processed, total, geocodeResults) {
 function saveLocationsToSession() {
   try {
     sessionStorage.setItem('haisha_locations', JSON.stringify(locations));
+  sessionStorage.setItem('haisha_assignments', JSON.stringify(assignments));
     sessionStorage.setItem('haisha_currentDate', currentDate);
     sessionStorage.setItem('haisha_assignments', JSON.stringify(assignments));
     sessionStorage.setItem('haisha_depot', JSON.stringify(DEPOT));
@@ -1815,6 +1816,7 @@ function autoAssign() {
 
   const assignedCount   = Object.keys(assignments).length;
   const unassignedCount = locations.length - assignedCount;
+  sessionStorage.setItem('haisha_assignments', JSON.stringify(assignments));
   renderAssignPanel();
   document.getElementById('status').textContent =
     `自動配車完了：${assignedCount}件割当 / 未割当${unassignedCount}件（手動で調整できます）`;
