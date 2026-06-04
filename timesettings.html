@@ -88,14 +88,10 @@
   <div class="section">
     <div class="section-title">🚗 基本設定</div>
     <div class="card">
-      <div class="basic-grid" style="grid-template-columns:1fr 1fr;">
+      <div class="basic-grid" style="grid-template-columns:1fr;">
         <div class="form-group">
-          <label>平均移動速度（km/h）</label>
-          <input type="number" id="speed" value="40" min="10" max="120">
-        </div>
-        <div class="form-group">
-          <label>標準出発時刻</label>
-          <input type="time" id="depart-time" value="07:00">
+          <label>店舗間の平均移動速度（km/h）※直線距離換算。実際は20〜25km/h推奨</label>
+          <input type="number" id="speed" value="25" min="5" max="80" style="max-width:200px;">
         </div>
       </div>
     </div>
@@ -194,8 +190,7 @@
 const STORAGE_KEY = 'haisha_time_settings';
 
 const DEFAULTS = {
-  speed: 40,
-  departTime: '07:00',
+  speed: 25,
   unloadSteps: [
     { from: 1,   to: 10,  min: 5  },
     { from: 11,  to: 20,  min: 8  },
@@ -219,8 +214,7 @@ function loadSettings() {
 }
 
 function saveSettings() {
-  settings.speed      = Number(document.getElementById('speed').value) || 40;
-  settings.departTime = document.getElementById('depart-time').value || '07:00';
+  settings.speed = Number(document.getElementById('speed').value) || 25;
   settings.unloadSteps = readRows('unload');
   settings.loadSteps   = readRows('load');
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
@@ -295,8 +289,7 @@ function updatePreviews() {
 }
 
 function applyToForm() {
-  document.getElementById('speed').value      = settings.speed;
-  document.getElementById('depart-time').value = settings.departTime || '07:00';
+  document.getElementById('speed').value = settings.speed || 25;
   renderRows('unload', settings.unloadSteps);
   renderRows('load',   settings.loadSteps);
 }
