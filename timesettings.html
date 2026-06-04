@@ -71,6 +71,7 @@
     .preview-row { display: flex; gap: 8px; flex-wrap: wrap; }
     .preview-chip { background: rgba(255,255,255,0.06); border-radius: 4px; padding: 4px 10px; font-size: 12px; color: rgba(255,255,255,0.7); }
   </style>
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBP4DqTiYGVyDZv4mwguXoHYfcpHt4kO8E"></script>
 </head>
 <body>
 
@@ -337,6 +338,11 @@ async function fetchAllTravelTimes() {
   const progressEl = document.getElementById('fetch-progress');
   const barEl = document.getElementById('fetch-bar');
 
+  if (!window.google || !window.google.maps) {
+    statusEl.textContent = 'Google Mapsの読み込み中です。少し待ってから再試行してください。';
+    return;
+  }
+
   const stores = (() => { try { return JSON.parse(localStorage.getItem('haisha_stores') || '{}'); } catch(e) { return {}; } })();
   const codes = Object.keys(stores);
   if (codes.length === 0) { statusEl.textContent = '店舗データがありません。CSVを先に読み込んでください。'; return; }
@@ -356,6 +362,7 @@ async function fetchAllTravelTimes() {
     if (byDepot[dCode]) byDepot[dCode].push({ code, lat: s.lat, lng: s.lng });
   });
 
+  const service = new google.maps.DistanceMatrixService();
   const BATCH = 25;
   const total = Object.values(byDepot).reduce((s, a) => s + a.length, 0);
   let done = 0;
@@ -363,41 +370,41 @@ async function fetchAllTravelTimes() {
   for (const [depotCode, shopList] of Object.entries(byDepot)) {
     if (shopList.length === 0) continue;
     const origin = DEPOT_ORIGINS[depotCode];
+    const originLatLng = new google.maps.LatLng(origin.lat, origin.lng);
 
     for (let i = 0; i < shopList.length; i += BATCH) {
       const batch = shopList.slice(i, i + BATCH);
-      const origStr = `${origin.lat},${origin.lng}`;
-      const destStr = batch.map(s => `${s.lat},${s.lng}`).join('|');
-      const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origStr)}&destinations=${encodeURIComponent(destStr)}&mode=driving&language=ja&key=${MAPS_KEY_DM}`;
+      const destinations = batch.map(s => new google.maps.LatLng(s.lat, s.lng));
 
-      try {
-        const res = await fetch(url);
-        const data = await res.json();
-        if (data.status === 'OK' && data.rows && data.rows[0]) {
-          data.rows[0].elements.forEach((el, j) => {
-            if (el.status === 'OK') {
-              cache[batch[j].code] = {
-                duration_sec: el.duration.value,
-                distance_m: el.distance.value,
-                depot: depotCode,
-                updated: new Date().toISOString(),
-              };
-            }
-          });
-        } else {
-          statusEl.textContent = `APIエラー: ${data.status} ${data.error_message || ''}`;
-          console.warn(data);
-        }
-        done += batch.length;
-        const pct = Math.round(done / total * 100);
-        barEl.style.width = pct + '%';
-        statusEl.textContent = `取得中... ${done}/${total}件`;
-        await new Promise(r => setTimeout(r, 300));
-      } catch(e) {
-        statusEl.textContent = `通信エラー: ${e.message}`;
-        console.error(e);
-        break;
-      }
+      await new Promise((resolve) => {
+        service.getDistanceMatrix({
+          origins: [originLatLng],
+          destinations: destinations,
+          travelMode: google.maps.TravelMode.DRIVING,
+        }, (response, status) => {
+          if (status === 'OK' && response.rows[0]) {
+            response.rows[0].elements.forEach((el, j) => {
+              if (el.status === 'OK') {
+                cache[batch[j].code] = {
+                  duration_sec: el.duration.value,
+                  distance_m: el.distance.value,
+                  depot: depotCode,
+                  updated: new Date().toISOString(),
+                };
+              }
+            });
+          } else {
+            console.warn('DistanceMatrix error:', status);
+            statusEl.textContent = `APIエラー: ${status}`;
+          }
+          done += batch.length;
+          const pct = Math.round(done / total * 100);
+          barEl.style.width = pct + '%';
+          statusEl.textContent = `取得中... ${done}/${total}件`;
+          resolve();
+        });
+      });
+      await new Promise(r => setTimeout(r, 200)); // APIレート制限対策
     }
   }
 
